@@ -159,7 +159,13 @@ function VendorSignupForm() {
       }
 
       // Update vendor record to link with new user
-      const { error: updateError } = await supabase
+      console.log('Attempting to update vendor with:', {
+        user_id: userId,
+        vendor_status: 'accepted',
+        token: token
+      })
+      
+      const { data: updateData, error: updateError } = await supabase
         .from('vendors')
         .update({
           user_id: userId,
@@ -167,10 +173,19 @@ function VendorSignupForm() {
           accepted_at: new Date().toISOString()
         })
         .eq('invitation_token', token)
+        .select()
 
       if (updateError) {
         console.error('Vendor update error:', updateError)
+        console.error('Error details:', {
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          code: updateError.code
+        })
         // Still continue - account was created successfully
+      } else {
+        console.log('Vendor update successful:', updateData)
       }
 
       toast.success('Account created successfully!', {
