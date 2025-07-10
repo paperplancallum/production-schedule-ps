@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Mail, Loader2, MoreHorizontal, Trash2, Edit2 } from 'lucide-react'
+import { Plus, Mail, Loader2, MoreHorizontal, Trash2, Edit2, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
@@ -56,6 +56,7 @@ export default function VendorTable({ initialVendors, currentUserId }) {
   const [invitingVendorId, setInvitingVendorId] = useState(null)
   const [deletingVendorId, setDeletingVendorId] = useState(null)
   const [editingVendor, setEditingVendor] = useState(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [newVendor, setNewVendor] = useState({
     vendorName: '',
     email: '',
@@ -71,6 +72,30 @@ export default function VendorTable({ initialVendors, currentUserId }) {
       ...prev,
       [name]: value
     }))
+  }
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      const supabase = createClient()
+      const { data: refreshedVendors, error } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('seller_id', currentUserId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      setVendors(refreshedVendors || [])
+      toast.success('Vendors list refreshed')
+    } catch (error) {
+      console.error('Error refreshing vendors:', error)
+      toast.error('Failed to refresh vendors', {
+        description: error.message
+      })
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   const handleSelectChange = (value) => {
@@ -446,10 +471,20 @@ export default function VendorTable({ initialVendors, currentUserId }) {
             Manage your vendor relationships
           </p>
         </div>
-        <Button onClick={() => setIsAddVendorOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Vendor
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button onClick={() => setIsAddVendorOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Vendor
+          </Button>
+        </div>
       </div>
 
       <DataTable 
