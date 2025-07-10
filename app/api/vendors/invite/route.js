@@ -7,6 +7,10 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 export async function POST(request) {
   try {
     const { vendorId } = await request.json()
+    
+    // Get the host from request headers as a fallback
+    const host = request.headers.get('host')
+    const protocol = request.headers.get('x-forwarded-proto') || 'https'
 
     if (!vendorId) {
       return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 })
@@ -62,12 +66,24 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Failed to update vendor status' }, { status: 500 })
     }
 
-    // Send invitation email
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-                    'http://localhost:3000'
+    // Send invitation email - determine the base URL
+    let baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    
+    if (!baseUrl && process.env.VERCEL_URL) {
+      // On Vercel, use the deployment URL
+      baseUrl = `https://${process.env.VERCEL_URL}`
+    } else if (!baseUrl && host) {
+      // Use request host as fallback
+      baseUrl = `${protocol}://${host}`
+    } else if (!baseUrl) {
+      // Local development fallback
+      baseUrl = 'http://localhost:3000'
+    }
+    
     const invitationUrl = `${baseUrl}/vendor-signup?token=${invitationToken}`
     
+    console.log('Base URL:', baseUrl)
+    console.log('Invitation URL:', invitationUrl)
     console.log('Attempting to send email to:', vendor.email)
     console.log('Using Resend API key:', process.env.RESEND_API_KEY ? 'Key is set' : 'Key is missing')
     
