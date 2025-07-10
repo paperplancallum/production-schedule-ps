@@ -14,7 +14,9 @@ To send emails to other recipients, please verify a domain at resend.com/domains
 ### For Production Use
 1. Go to https://resend.com/domains
 2. Add and verify your domain (e.g., paperplan.co)
-3. Update the `from` address in the code to use your verified domain
+3. Update the `RESEND_FROM_EMAIL` environment variable:
+   - In `.env.local`: `RESEND_FROM_EMAIL="Production Schedule <noreply@paperplan.co>"`
+   - In Vercel: Add the same environment variable in your project settings
 4. Emails will then work for all recipients
 
 ### For Development/Testing

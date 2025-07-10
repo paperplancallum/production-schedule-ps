@@ -72,7 +72,7 @@ export async function POST(request) {
       // Note: Resend test mode only allows sending to account owner email
       // For production, verify your domain at resend.com/domains
       const { data: emailData, error: emailError } = await resend.emails.send({
-        from: 'onboarding@resend.dev',
+        from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
         to: vendor.email,
         subject: `${sellerName} invites you to join their vendor network`,
         html: `
