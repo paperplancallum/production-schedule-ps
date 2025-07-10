@@ -1,7 +1,7 @@
 -- Check current vendor update policies
 SELECT pol.polname, pol.polcmd, 
        pg_get_expr(pol.polqual, pol.polrelid) as using_expression,
-       pg_get_expr(pol.polwith, pol.polrelid) as with_check
+       pg_get_expr(pol.polwithcheck, pol.polrelid) as with_check
 FROM pg_policy pol
 JOIN pg_class cls ON pol.polrelid = cls.oid
 WHERE cls.relname = 'vendors' AND pol.polcmd = 'w';
@@ -54,13 +54,12 @@ CREATE POLICY "Allow vendor access" ON vendors
   );
 
 -- Debug: Check if there are any vendors with the email in question
-SELECT id, email, vendor_status, user_id, invitation_token, accepted_at
+SELECT id, email, vendor_status, user_id, invitation_token, created_at
 FROM vendors
 WHERE email = 'callum+3@paperplan.co';
 
 -- If the vendor exists but status wasn't updated, you can manually fix it:
 -- UPDATE vendors 
--- SET vendor_status = 'accepted', 
---     accepted_at = NOW()
+-- SET vendor_status = 'accepted'
 -- WHERE email = 'callum+3@paperplan.co' 
 -- AND user_id IS NOT NULL;

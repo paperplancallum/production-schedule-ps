@@ -158,34 +158,37 @@ function VendorSignupForm() {
         // Continue anyway - profile might be created by trigger
       }
 
-      // Update vendor record to link with new user
+      // Update vendor record via API route (bypasses RLS)
       console.log('Attempting to update vendor with:', {
         user_id: userId,
         vendor_status: 'accepted',
         token: token
       })
       
-      const { data: updateData, error: updateError } = await supabase
-        .from('vendors')
-        .update({
-          user_id: userId,
-          vendor_status: 'accepted',
-          accepted_at: new Date().toISOString()
+      try {
+        const response = await fetch('/api/vendors/complete-signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            token: token,
+            userId: userId
+          })
         })
-        .eq('invitation_token', token)
-        .select()
 
-      if (updateError) {
-        console.error('Vendor update error:', updateError)
-        console.error('Error details:', {
-          message: updateError.message,
-          details: updateError.details,
-          hint: updateError.hint,
-          code: updateError.code
-        })
+        const result = await response.json()
+
+        if (!response.ok) {
+          console.error('Vendor update error:', result)
+          console.error('Error details:', result.details)
+          // Still continue - account was created successfully
+        } else {
+          console.log('Vendor update successful:', result)
+        }
+      } catch (updateError) {
+        console.error('Failed to update vendor status:', updateError)
         // Still continue - account was created successfully
-      } else {
-        console.log('Vendor update successful:', updateData)
       }
 
       toast.success('Account created successfully!', {
