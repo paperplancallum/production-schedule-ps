@@ -49,11 +49,13 @@ CREATE POLICY "Allow vendor signup completion" ON vendors
   );
 
 -- Also allow vendors to view their own records
+DROP POLICY IF EXISTS "Vendors can view their own records" ON vendors;
 CREATE POLICY "Vendors can view their own records" ON vendors
   FOR SELECT
   USING (user_id = auth.uid());
 
 -- Allow vendors to update their own records (for future features)
+DROP POLICY IF EXISTS "Vendors can update their own records" ON vendors;
 CREATE POLICY "Vendors can update their own records" ON vendors
   FOR UPDATE
   USING (user_id = auth.uid())

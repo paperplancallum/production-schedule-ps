@@ -141,13 +141,16 @@ function VendorSignupForm() {
       const userId = authData.user?.id
       if (!userId) throw new Error('Failed to create user account')
 
-      // Create vendor profile
+      // Create or update vendor profile
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
+        .upsert({
           id: userId,
           email: vendor.email,
-          user_type: 'vendor'
+          user_type: 'vendor',
+          full_name: `${formData.firstName} ${formData.lastName}`.trim()
+        }, {
+          onConflict: 'id'
         })
 
       if (profileError) {
