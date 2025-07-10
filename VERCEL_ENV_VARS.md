@@ -8,8 +8,8 @@ https://vercel.com/paperplancallums-projects/ps/settings/environment-variables
 ## 2. Add these variables:
 
 ### NEXT_PUBLIC_APP_URL
-**Value:** `https://ps.vercel.app` (or your custom domain)
-**Note:** Update this with your actual production URL
+**Value:** `https://app.paperplan.co`
+**Note:** Use this once your custom domain is set up. Until then, use `https://production-schedule-ps.vercel.app`
 
 ### NEXT_PUBLIC_SUPABASE_URL
 **Value:** `https://umpyksvodclguitcwcmv.supabase.co`
