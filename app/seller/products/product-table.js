@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { format } from 'date-fns'
 
 const columns = [
@@ -179,7 +179,6 @@ export function ProductTable() {
     unit_of_measure: '',
     status: 'active',
   })
-  const { toast } = useToast()
   const supabase = createClient()
 
   useEffect(() => {
@@ -229,10 +228,8 @@ export function ProductTable() {
       console.error('Error fetching products:', error)
       // Don't show error toast for missing table
       if (!error.message?.includes('42P01')) {
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch products. Please try again.',
-          variant: 'destructive',
+        toast.error('Failed to fetch products', {
+          description: 'Please try again.'
         })
       }
     } finally {
@@ -271,20 +268,15 @@ export function ProductTable() {
 
       if (error) throw error
 
-      toast({
-        title: 'Success',
-        description: 'Product added successfully',
-      })
+      toast.success('Product added successfully')
 
       setIsAddingProduct(false)
       resetForm()
       fetchProducts()
     } catch (error) {
       console.error('Error adding product:', error)
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to add product',
-        variant: 'destructive',
+      toast.error('Failed to add product', {
+        description: error.message
       })
     }
   }
@@ -306,20 +298,15 @@ export function ProductTable() {
 
       if (error) throw error
 
-      toast({
-        title: 'Success',
-        description: 'Product updated successfully',
-      })
+      toast.success('Product updated successfully')
 
       setEditingProduct(null)
       resetForm()
       fetchProducts()
     } catch (error) {
       console.error('Error updating product:', error)
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to update product',
-        variant: 'destructive',
+      toast.error('Failed to update product', {
+        description: error.message
       })
     }
   }
@@ -335,19 +322,12 @@ export function ProductTable() {
 
       if (error) throw error
 
-      toast({
-        title: 'Success',
-        description: 'Product deleted successfully',
-      })
+      toast.success('Product deleted successfully')
 
       fetchProducts()
     } catch (error) {
       console.error('Error deleting product:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to delete product',
-        variant: 'destructive',
-      })
+      toast.error('Failed to delete product')
     }
   }
 
