@@ -32,6 +32,8 @@ function VendorSignupForm() {
     try {
       const supabase = createClient()
       
+      console.log('Verifying invitation token:', token)
+      
       // Verify the invitation token
       const { data: vendorData, error: vendorError } = await supabase
         .from('vendors')
@@ -39,7 +41,10 @@ function VendorSignupForm() {
         .eq('invitation_token', token)
         .single()
 
+      console.log('Vendor query result:', { vendorData, vendorError })
+
       if (vendorError || !vendorData) {
+        console.error('Vendor verification failed:', vendorError)
         setError('Invalid or expired invitation token')
         setLoading(false)
         return
