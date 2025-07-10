@@ -12,37 +12,21 @@ export default async function VendorsPage() {
     redirect('/login')
   }
 
-  // Try to fetch from vendors_simple first
-  let vendors = []
-  let vendorsError = null
-  
-  // First try vendors_simple
-  const { data: vendorsSimple, error: simpleError } = await supabase
-    .from('vendors_simple')
+  // Fetch vendors
+  const { data: vendors, error: vendorsError } = await supabase
+    .from('vendors')
     .select('*')
     .eq('seller_id', user.id)
     .order('created_at', { ascending: false })
 
-  if (!simpleError) {
-    vendors = vendorsSimple
-  } else {
-    // If vendors_simple doesn't exist, try original vendors table
-    const { data: vendorsOriginal, error: originalError } = await supabase
-      .from('vendors')
-      .select('*')
-      .eq('seller_id', user.id)
-      .order('created_at', { ascending: false })
-    
-    if (!originalError) {
-      vendors = vendorsOriginal
-    } else {
-      vendorsError = simpleError // Use the simple table error as primary
-      console.error('Error fetching vendors:', {
-        simpleError: simpleError?.message,
-        originalError: originalError?.message,
-        hint: 'Table might not exist. Visit /setup-vendors to create it.'
-      })
-    }
+  if (vendorsError) {
+    console.error('Error fetching vendors:', {
+      error: vendorsError,
+      message: vendorsError?.message,
+      details: vendorsError?.details,
+      hint: vendorsError?.hint,
+      code: vendorsError?.code
+    })
   }
 
   return (
@@ -60,7 +44,6 @@ export default async function VendorsPage() {
       <VendorTable 
         initialVendors={vendors || []} 
         currentUserId={user.id}
-        tableName={vendorsError ? null : (vendors === vendorsSimple ? 'vendors_simple' : 'vendors')}
       />
     </div>
   )

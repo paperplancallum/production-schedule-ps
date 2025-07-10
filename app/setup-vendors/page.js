@@ -11,8 +11,11 @@ export default function SetupVendorsPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
 
-  const sql = `-- Create a simple vendors table that doesn't require profile connection
-CREATE TABLE IF NOT EXISTS vendors_simple (
+  const sql = `-- First drop the old vendors table if it exists
+DROP TABLE IF EXISTS vendors CASCADE;
+
+-- Create a simple vendors table that doesn't require profile connection
+CREATE TABLE IF NOT EXISTS vendors (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   seller_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   vendor_name TEXT NOT NULL,
@@ -28,28 +31,28 @@ CREATE TABLE IF NOT EXISTS vendors_simple (
 );
 
 -- Create indexes
-CREATE INDEX IF NOT EXISTS idx_vendors_simple_seller_id ON vendors_simple(seller_id);
-CREATE INDEX IF NOT EXISTS idx_vendors_simple_vendor_status ON vendors_simple(vendor_status);
-CREATE INDEX IF NOT EXISTS idx_vendors_simple_vendor_type ON vendors_simple(vendor_type);
+CREATE INDEX IF NOT EXISTS idx_vendors_seller_id ON vendors(seller_id);
+CREATE INDEX IF NOT EXISTS idx_vendors_vendor_status ON vendors(vendor_status);
+CREATE INDEX IF NOT EXISTS idx_vendors_vendor_type ON vendors(vendor_type);
 
 -- Enable RLS
-ALTER TABLE vendors_simple ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
-CREATE POLICY "Sellers can view their vendors" ON vendors_simple
+CREATE POLICY "Sellers can view their vendors" ON vendors
   FOR SELECT
   USING (seller_id = auth.uid());
 
-CREATE POLICY "Sellers can insert vendors" ON vendors_simple
+CREATE POLICY "Sellers can insert vendors" ON vendors
   FOR INSERT
   WITH CHECK (seller_id = auth.uid());
 
-CREATE POLICY "Sellers can update their vendors" ON vendors_simple
+CREATE POLICY "Sellers can update their vendors" ON vendors
   FOR UPDATE
   USING (seller_id = auth.uid())
   WITH CHECK (seller_id = auth.uid());
 
-CREATE POLICY "Sellers can delete their vendors" ON vendors_simple
+CREATE POLICY "Sellers can delete their vendors" ON vendors
   FOR DELETE
   USING (seller_id = auth.uid());`
 
@@ -78,7 +81,7 @@ CREATE POLICY "Sellers can delete their vendors" ON vendors_simple
         <CardHeader>
           <CardTitle>Setup Vendors Table</CardTitle>
           <CardDescription>
-            This page helps you set up the vendors_simple table in your Supabase database
+            This page helps you consolidate and set up the vendors table in your Supabase database
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

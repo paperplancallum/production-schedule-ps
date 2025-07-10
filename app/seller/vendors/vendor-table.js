@@ -39,7 +39,7 @@ const vendorStatuses = [
   { value: 'archived', label: 'Archived', className: 'bg-red-100 text-red-800' }
 ]
 
-export default function VendorTable({ initialVendors, currentUserId, tableName = 'vendors_simple' }) {
+export default function VendorTable({ initialVendors, currentUserId }) {
   const router = useRouter()
   const [vendors, setVendors] = useState(initialVendors || [])
   const [isAddVendorOpen, setIsAddVendorOpen] = useState(false)
@@ -97,7 +97,7 @@ export default function VendorTable({ initialVendors, currentUserId, tableName =
       console.log('Inserting vendor data:', vendorData)
       
       const { data, error } = await supabase
-        .from(tableName)
+        .from('vendors')
         .insert(vendorData)
         .select()
         .single()
