@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus } from 'lucide-react'
+import { Plus, Mail, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -34,7 +34,7 @@ const vendorTypes = [
 
 const vendorStatuses = [
   { value: 'draft', label: 'Draft', className: 'bg-gray-100 text-gray-800' },
-  { value: 'invited', label: 'Invited', className: 'bg-blue-100 text-blue-800' },
+  { value: 'invited', label: 'Invited to Join', className: 'bg-yellow-100 text-yellow-800' },
   { value: 'accepted', label: 'Accepted', className: 'bg-green-100 text-green-800' },
   { value: 'archived', label: 'Archived', className: 'bg-red-100 text-red-800' }
 ]
@@ -44,6 +44,7 @@ export default function VendorTable({ initialVendors, currentUserId }) {
   const [vendors, setVendors] = useState(initialVendors || [])
   const [isAddVendorOpen, setIsAddVendorOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [invitingVendorId, setInvitingVendorId] = useState(null)
   const [newVendor, setNewVendor] = useState({
     vendorName: '',
     email: '',
@@ -66,6 +67,47 @@ export default function VendorTable({ initialVendors, currentUserId }) {
       ...prev,
       vendorType: value
     }))
+  }
+
+  const handleInviteVendor = async (vendorId) => {
+    setInvitingVendorId(vendorId)
+    
+    try {
+      const response = await fetch('/api/vendors/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ vendorId }),
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to invite vendor')
+      }
+      
+      // Update local state to reflect new status
+      setVendors(vendors.map(v => 
+        v.id === vendorId 
+          ? { ...v, vendor_status: 'invited' }
+          : v
+      ))
+      
+      // Refresh to get updated data
+      router.refresh()
+      
+      if (data.warning) {
+        alert(`Status updated but: ${data.warning}`)
+      } else {
+        alert('Invitation sent successfully!')
+      }
+    } catch (error) {
+      console.error('Error inviting vendor:', error)
+      alert(`Failed to invite vendor: ${error.message}`)
+    } finally {
+      setInvitingVendorId(null)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -215,6 +257,39 @@ export default function VendorTable({ initialVendors, currentUserId }) {
             {status?.label || 'Draft'}
           </span>
         )
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const vendor = row.original
+        const isInviting = invitingVendorId === vendor.id
+        
+        if (vendor.vendor_status === 'draft') {
+          return (
+            <Button
+              size="sm"
+              onClick={() => handleInviteVendor(vendor.id)}
+              disabled={isInviting}
+            >
+              {isInviting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Inviting...
+                </>
+              ) : (
+                <>
+                  <Mail className="h-4 w-4 mr-1" />
+                  Invite Vendor
+                </>
+              )}
+            </Button>
+          )
+        }
+        
+        // For other statuses, we can add more actions later
+        return null
       },
     },
   ]

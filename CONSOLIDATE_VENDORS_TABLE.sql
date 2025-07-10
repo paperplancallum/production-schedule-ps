@@ -30,6 +30,8 @@ BEGIN
       vendor_type TEXT CHECK (vendor_type IN ('warehouse', 'supplier', 'inspection_agent', 'shipping_agent')),
       vendor_status TEXT DEFAULT 'draft' CHECK (vendor_status IN ('draft', 'invited', 'accepted', 'archived')),
       vendor_code TEXT UNIQUE DEFAULT 'V' || LPAD(FLOOR(RANDOM() * 999999)::TEXT, 6, '0'),
+      invitation_token UUID,
+      invitation_sent_at TIMESTAMP WITH TIME ZONE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
     );
@@ -38,6 +40,10 @@ BEGIN
     CREATE INDEX idx_vendors_seller_id ON vendors(seller_id);
     CREATE INDEX idx_vendors_vendor_status ON vendors(vendor_status);
     CREATE INDEX idx_vendors_vendor_type ON vendors(vendor_type);
+    CREATE INDEX idx_vendors_invitation_token ON vendors(invitation_token);
+    
+    -- Add unique constraint for invitation token
+    ALTER TABLE vendors ADD CONSTRAINT vendors_invitation_token_unique UNIQUE (invitation_token);
 
     -- Enable RLS
     ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
