@@ -63,13 +63,17 @@ export async function POST(request) {
     }
 
     // Send invitation email
-    const invitationUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/vendor-signup?token=${invitationToken}`
+    const invitationUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://your-app.com'}/vendor-signup?token=${invitationToken}`
     
-    const { data: emailData, error: emailError } = await resend.emails.send({
-      from: 'Production Schedule <onboarding@resend.dev>',
-      to: vendor.email,
-      subject: `${sellerName} invites you to join their vendor network`,
-      html: `
+    console.log('Attempting to send email to:', vendor.email)
+    console.log('Using Resend API key:', process.env.RESEND_API_KEY ? 'Key is set' : 'Key is missing')
+    
+    try {
+      const { data: emailData, error: emailError } = await resend.emails.send({
+        from: 'Production Schedule <onboarding@resend.dev>',
+        to: vendor.email,
+        subject: `${sellerName} invites you to join their vendor network`,
+        html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2>You're invited to join ${sellerName}'s vendor network</h2>
           <p>Hello ${vendor.contact_name || 'there'},</p>
@@ -88,15 +92,39 @@ export async function POST(request) {
           </p>
         </div>
       `
-    })
+      })
 
-    if (emailError) {
-      console.error('Error sending email:', emailError)
+      if (emailError) {
+        throw emailError
+      }
+
+      console.log('Email sent successfully:', emailData)
+    } catch (emailError) {
+      console.error('Error sending email:', {
+        error: emailError,
+        message: emailError?.message,
+        name: emailError?.name,
+        statusCode: emailError?.statusCode
+      })
+      
+      // Common Resend errors
+      let errorDetails = 'Email failed to send'
+      if (emailError?.message?.includes('domain')) {
+        errorDetails = 'Email domain not verified with Resend'
+      } else if (emailError?.message?.includes('API')) {
+        errorDetails = 'Invalid Resend API key'
+      } else if (emailError?.statusCode === 401) {
+        errorDetails = 'Resend authentication failed - check API key'
+      }
+      
       // Even if email fails, we've updated the status
       return NextResponse.json({ 
         success: true, 
-        warning: 'Status updated but email failed to send',
-        vendor_status: 'invited'
+        warning: `Status updated but email failed: ${errorDetails}`,
+        vendor_status: 'invited',
+        emailError: emailError?.message,
+        invitationUrl: invitationUrl, // Include the URL so user can copy it manually
+        vendorEmail: vendor.email
       })
     }
 

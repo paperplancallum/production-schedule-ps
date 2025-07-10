@@ -157,7 +157,25 @@ export default function VendorTable({ initialVendors, currentUserId }) {
       router.refresh()
       
       if (data.warning) {
-        toast.warning(`Status updated but: ${data.warning}`)
+        // Email failed but status updated
+        if (data.invitationUrl) {
+          // Show a toast with ability to copy the invitation link
+          toast.warning(data.warning, {
+            description: 'Click below to copy the invitation link and send it manually.',
+            action: {
+              label: 'Copy invitation link',
+              onClick: () => {
+                navigator.clipboard.writeText(data.invitationUrl)
+                toast.success('Invitation link copied to clipboard!', {
+                  description: `Send this link to ${data.vendorEmail}`
+                })
+              }
+            },
+            duration: 10000 // Keep it visible longer
+          })
+        } else {
+          toast.warning(data.warning)
+        }
       } else {
         toast.success('Invitation sent successfully!', {
           description: `An invitation email has been sent to ${vendors.find(v => v.id === vendorId)?.email}`
