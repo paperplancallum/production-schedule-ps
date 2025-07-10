@@ -532,23 +532,30 @@ export default function VendorTable({ initialVendors, currentUserId }) {
                     <span className="text-xs text-muted-foreground ml-2">(Cannot be changed)</span>
                   )}
                 </Label>
-                <Select
-                  value={newVendor.vendorType}
-                  onValueChange={handleSelectChange}
-                  required={!editingVendor}
-                  disabled={!!editingVendor}
-                >
-                  <SelectTrigger disabled={!!editingVendor} className={editingVendor ? "opacity-60 cursor-not-allowed" : ""}>
-                    <SelectValue placeholder="Select vendor type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vendorTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {editingVendor ? (
+                  <Input
+                    value={vendorTypes.find(t => t.value === newVendor.vendorType)?.label || newVendor.vendorType}
+                    disabled
+                    className="bg-muted"
+                  />
+                ) : (
+                  <Select
+                    value={newVendor.vendorType}
+                    onValueChange={handleSelectChange}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vendor type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendorTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-1">
                 <Label htmlFor="vendorName">Vendor Name</Label>
