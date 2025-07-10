@@ -15,13 +15,19 @@ CREATE TABLE IF NOT EXISTS public.products (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create indexes
-CREATE INDEX idx_products_seller_id ON public.products(seller_id);
-CREATE INDEX idx_products_status ON public.products(status);
-CREATE INDEX idx_products_sku ON public.products(sku);
+-- Create indexes if they don't exist
+CREATE INDEX IF NOT EXISTS idx_products_seller_id ON public.products(seller_id);
+CREATE INDEX IF NOT EXISTS idx_products_status ON public.products(status);
+CREATE INDEX IF NOT EXISTS idx_products_sku ON public.products(sku);
 
 -- Enable RLS
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Sellers can view own products" ON public.products;
+DROP POLICY IF EXISTS "Sellers can insert own products" ON public.products;
+DROP POLICY IF EXISTS "Sellers can update own products" ON public.products;
+DROP POLICY IF EXISTS "Sellers can delete own products" ON public.products;
 
 -- Create RLS policies
 -- Sellers can view their own products
@@ -69,6 +75,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger for updated_at
+-- Drop trigger if exists and recreate
+DROP TRIGGER IF EXISTS update_products_updated_at ON public.products;
 CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON public.products
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
