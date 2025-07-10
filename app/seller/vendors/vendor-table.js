@@ -22,9 +22,17 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Mail, Loader2 } from 'lucide-react'
+import { Plus, Mail, Loader2, MoreHorizontal, Trash2, Edit2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 const vendorTypes = [
   { value: 'warehouse', label: 'Warehouse' },
@@ -46,6 +54,8 @@ export default function VendorTable({ initialVendors, currentUserId }) {
   const [isAddVendorOpen, setIsAddVendorOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [invitingVendorId, setInvitingVendorId] = useState(null)
+  const [deletingVendorId, setDeletingVendorId] = useState(null)
+  const [editingVendor, setEditingVendor] = useState(null)
   const [newVendor, setNewVendor] = useState({
     vendorName: '',
     email: '',
@@ -68,6 +78,54 @@ export default function VendorTable({ initialVendors, currentUserId }) {
       ...prev,
       vendorType: value
     }))
+  }
+
+  const handleDeleteVendor = async (vendorId) => {
+    const vendor = vendors.find(v => v.id === vendorId)
+    if (!confirm(`Are you sure you want to delete ${vendor?.vendor_name}? This action cannot be undone.`)) {
+      return
+    }
+    
+    setDeletingVendorId(vendorId)
+    
+    try {
+      const supabase = createClient()
+      
+      const { error } = await supabase
+        .from('vendors')
+        .delete()
+        .eq('id', vendorId)
+      
+      if (error) throw error
+      
+      // Update local state
+      setVendors(vendors.filter(v => v.id !== vendorId))
+      
+      toast.success('Vendor deleted successfully')
+      
+      // Refresh to get updated data
+      router.refresh()
+    } catch (error) {
+      console.error('Error deleting vendor:', error)
+      toast.error('Failed to delete vendor', {
+        description: error.message
+      })
+    } finally {
+      setDeletingVendorId(null)
+    }
+  }
+  
+  const handleEditVendor = (vendor) => {
+    setEditingVendor(vendor)
+    setNewVendor({
+      vendorName: vendor.vendor_name,
+      email: vendor.email,
+      country: vendor.country || '',
+      address: vendor.address || '',
+      contactName: vendor.contact_name || '',
+      vendorType: vendor.vendor_type
+    })
+    setIsAddVendorOpen(true)
   }
 
   const handleInviteVendor = async (vendorId) => {
@@ -129,31 +187,52 @@ export default function VendorTable({ initialVendors, currentUserId }) {
     const supabase = createClient()
     
     try {
-      // Insert new vendor without an id (not linked to a profile yet)
       const vendorData = {
-        seller_id: currentUserId,
         vendor_name: newVendor.vendorName,
         email: newVendor.email,
         country: newVendor.country,
         address: newVendor.address,
         contact_name: newVendor.contactName,
         vendor_type: newVendor.vendorType,
-        vendor_status: 'draft' // New vendors start as draft
       }
       
-      console.log('Inserting vendor data:', vendorData)
+      let data
       
-      const { data, error } = await supabase
-        .from('vendors')
-        .insert(vendorData)
-        .select()
-        .single()
+      if (editingVendor) {
+        // Update existing vendor
+        const { data: updatedData, error } = await supabase
+          .from('vendors')
+          .update(vendorData)
+          .eq('id', editingVendor.id)
+          .select()
+          .single()
+        
+        if (error) throw error
+        data = updatedData
+        
+        // Update local state
+        setVendors(vendors.map(v => v.id === editingVendor.id ? data : v))
+      } else {
+        // Insert new vendor
+        const { data: newData, error } = await supabase
+          .from('vendors')
+          .insert({
+            ...vendorData,
+            seller_id: currentUserId,
+            vendor_status: 'draft' // New vendors start as draft
+          })
+          .select()
+          .single()
+        
+        if (error) throw error
+        data = newData
+        
+        // Update local state
+        setVendors([...vendors, data])
+      }
       
-      if (error) throw error
-      
-      // Update local state
-      setVendors([...vendors, data])
       setIsAddVendorOpen(false)
+      setEditingVendor(null)
       
       // Reset form
       setNewVendor({
@@ -166,9 +245,15 @@ export default function VendorTable({ initialVendors, currentUserId }) {
       })
       
       // Show success message
-      toast.success('Vendor added successfully!', {
-        description: `${data.vendor_name} has been added as a ${data.vendor_type.replace('_', ' ')}.`
-      })
+      if (editingVendor) {
+        toast.success('Vendor updated successfully!', {
+          description: `${data.vendor_name} has been updated.`
+        })
+      } else {
+        toast.success('Vendor added successfully!', {
+          description: `${data.vendor_name} has been added as a ${data.vendor_type.replace('_', ' ')}.`
+        })
+      }
       
       // Refresh the page to get updated data
       router.refresh()
@@ -283,31 +368,51 @@ export default function VendorTable({ initialVendors, currentUserId }) {
       cell: ({ row }) => {
         const vendor = row.original
         const isInviting = invitingVendorId === vendor.id
+        const isDeleting = deletingVendorId === vendor.id
         
-        if (vendor.vendor_status === 'draft') {
-          return (
-            <Button
-              size="sm"
-              onClick={() => handleInviteVendor(vendor.id)}
-              disabled={isInviting}
-            >
-              {isInviting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Inviting...
-                </>
-              ) : (
-                <>
-                  <Mail className="h-4 w-4 mr-1" />
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="h-8 w-8 p-0"
+                disabled={isInviting || isDeleting}
+              >
+                <span className="sr-only">Open menu</span>
+                {isInviting || isDeleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => handleEditVendor(vendor)}
+              >
+                <Edit2 className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              {vendor.vendor_status === 'draft' && (
+                <DropdownMenuItem 
+                  onClick={() => handleInviteVendor(vendor.id)}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
                   Invite Vendor
-                </>
+                </DropdownMenuItem>
               )}
-            </Button>
-          )
-        }
-        
-        // For other statuses, we can add more actions later
-        return null
+              <DropdownMenuItem 
+                onClick={() => handleDeleteVendor(vendor.id)}
+                className="text-red-600"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
       },
     },
   ]
@@ -335,12 +440,27 @@ export default function VendorTable({ initialVendors, currentUserId }) {
         searchKey="vendor_name"
       />
 
-      <Sheet open={isAddVendorOpen} onOpenChange={setIsAddVendorOpen}>
+      <Sheet open={isAddVendorOpen} onOpenChange={(open) => {
+        setIsAddVendorOpen(open)
+        if (!open) {
+          setEditingVendor(null)
+          setNewVendor({
+            vendorName: '',
+            email: '',
+            country: '',
+            address: '',
+            contactName: '',
+            vendorType: ''
+          })
+        }
+      }}>
         <SheetContent className="sm:max-w-[540px]">
           <SheetHeader>
-            <SheetTitle>Add New Vendor</SheetTitle>
+            <SheetTitle>{editingVendor ? 'Edit Vendor' : 'Add New Vendor'}</SheetTitle>
             <SheetDescription>
-              Fill in the details below to add a new vendor to your network.
+              {editingVendor 
+                ? 'Update the vendor details below.' 
+                : 'Fill in the details below to add a new vendor to your network.'}
             </SheetDescription>
           </SheetHeader>
           <form onSubmit={handleSubmit} className="flex flex-col h-full">
@@ -426,7 +546,7 @@ export default function VendorTable({ initialVendors, currentUserId }) {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Adding...' : 'Add Vendor'}
+                {isSubmitting ? (editingVendor ? 'Updating...' : 'Adding...') : (editingVendor ? 'Update Vendor' : 'Add Vendor')}
               </Button>
             </SheetFooter>
           </form>
