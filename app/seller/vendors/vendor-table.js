@@ -99,6 +99,9 @@ export default function VendorTable({ initialVendors, currentUserId }) {
   }
 
   const handleSelectChange = (value) => {
+    // Don't allow changing vendor type when editing
+    if (editingVendor) return
+    
     setNewVendor(prev => ({
       ...prev,
       vendorType: value
@@ -236,13 +239,17 @@ export default function VendorTable({ initialVendors, currentUserId }) {
         country: newVendor.country,
         address: newVendor.address,
         contact_name: newVendor.contactName,
-        vendor_type: newVendor.vendorType,
+      }
+      
+      // Only include vendor_type when creating new vendor
+      if (!editingVendor) {
+        vendorData.vendor_type = newVendor.vendorType
       }
       
       let data
       
       if (editingVendor) {
-        // Update existing vendor
+        // Update existing vendor (vendor_type excluded)
         const { data: updatedData, error } = await supabase
           .from('vendors')
           .update(vendorData)
@@ -528,10 +535,10 @@ export default function VendorTable({ initialVendors, currentUserId }) {
                 <Select
                   value={newVendor.vendorType}
                   onValueChange={handleSelectChange}
-                  required
+                  required={!editingVendor}
                   disabled={!!editingVendor}
                 >
-                  <SelectTrigger disabled={!!editingVendor}>
+                  <SelectTrigger disabled={!!editingVendor} className={editingVendor ? "opacity-60 cursor-not-allowed" : ""}>
                     <SelectValue placeholder="Select vendor type" />
                   </SelectTrigger>
                   <SelectContent>
