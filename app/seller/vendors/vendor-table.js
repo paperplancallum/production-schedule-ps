@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { DataTable } from "@/components/ui/data-table"
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
 import {
@@ -98,13 +99,17 @@ export default function VendorTable({ initialVendors, currentUserId }) {
       router.refresh()
       
       if (data.warning) {
-        alert(`Status updated but: ${data.warning}`)
+        toast.warning(`Status updated but: ${data.warning}`)
       } else {
-        alert('Invitation sent successfully!')
+        toast.success('Invitation sent successfully!', {
+          description: `An invitation email has been sent to ${vendors.find(v => v.id === vendorId)?.email}`
+        })
       }
     } catch (error) {
       console.error('Error inviting vendor:', error)
-      alert(`Failed to invite vendor: ${error.message}`)
+      toast.error('Failed to invite vendor', {
+        description: error.message
+      })
     } finally {
       setInvitingVendorId(null)
     }
@@ -115,7 +120,7 @@ export default function VendorTable({ initialVendors, currentUserId }) {
     
     // Validate required fields
     if (!newVendor.vendorType) {
-      alert('Please select a vendor type')
+      toast.error('Please select a vendor type')
       return
     }
     
@@ -160,6 +165,11 @@ export default function VendorTable({ initialVendors, currentUserId }) {
         vendorType: ''
       })
       
+      // Show success message
+      toast.success('Vendor added successfully!', {
+        description: `${data.vendor_name} has been added as a ${data.vendor_type.replace('_', ' ')}.`
+      })
+      
       // Refresh the page to get updated data
       router.refresh()
     } catch (error) {
@@ -169,9 +179,17 @@ export default function VendorTable({ initialVendors, currentUserId }) {
       
       // Check if it's a table not found error
       if (errorMessage.includes('relation') && errorMessage.includes('does not exist')) {
-        alert(`The vendors table needs to be set up. Please visit /setup-vendors to create it.`)
+        toast.error('Database table not found', {
+          description: 'The vendors table needs to be set up. Please visit /setup-vendors to create it.',
+          action: {
+            label: 'Go to setup',
+            onClick: () => window.location.href = '/setup-vendors'
+          }
+        })
       } else {
-        alert(`Failed to add vendor: ${errorMessage}`)
+        toast.error('Failed to add vendor', {
+          description: errorMessage
+        })
       }
       
       // Log more details for debugging

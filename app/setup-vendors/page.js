@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -64,8 +65,7 @@ CREATE POLICY "Sellers can delete their vendors" ON vendors
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(sql)
-    setStatus('SQL copied to clipboard!')
-    setTimeout(() => setStatus(''), 3000)
+    toast.success('SQL copied to clipboard!')
   }
 
   const checkSetup = async () => {
@@ -154,10 +154,6 @@ CREATE POLICY "Sellers can delete their vendors" ON vendors
                 Copy SQL
               </Button>
             </div>
-            
-            {status && (
-              <p className="text-sm text-green-600 font-medium">{status}</p>
-            )}
           </div>
 
           <div className="border-t pt-4">
