@@ -137,7 +137,7 @@ CREATE POLICY "Sellers can delete their vendors" ON vendors
             <ol className="list-decimal list-inside text-sm space-y-1 text-gray-600">
               <li>Go to your Supabase Dashboard</li>
               <li>Navigate to SQL Editor</li>
-              <li>Paste the SQL below and click "Run"</li>
+              <li>Paste the SQL below and click &quot;Run&quot;</li>
             </ol>
 
             <div className="relative">
@@ -159,7 +159,7 @@ CREATE POLICY "Sellers can delete their vendors" ON vendors
           <div className="border-t pt-4">
             <h3 className="text-lg font-semibold mb-2">After Setup</h3>
             <p className="text-sm text-gray-600">
-              Once you've created the table, go back to the{' '}
+              Once you&apos;ve created the table, go back to the{' '}
               <a href="/seller/vendors" className="text-blue-600 hover:underline">
                 Vendors page
               </a>{' '}
