@@ -532,19 +532,23 @@ export default function VendorTable({ initialVendors, currentUserId }) {
                     <span className="text-xs text-muted-foreground ml-2">(Cannot be changed)</span>
                   )}
                 </Label>
-                {editingVendor ? (
-                  <Input
-                    value={vendorTypes.find(t => t.value === newVendor.vendorType)?.label || newVendor.vendorType}
-                    disabled
-                    className="bg-muted"
-                  />
+                {editingVendor && editingVendor.id ? (
+                  <div>
+                    <Input
+                      id="vendorType"
+                      value={vendorTypes.find(t => t.value === newVendor.vendorType)?.label || newVendor.vendorType}
+                      disabled
+                      className="bg-muted cursor-not-allowed"
+                      readOnly
+                    />
+                  </div>
                 ) : (
                   <Select
                     value={newVendor.vendorType}
                     onValueChange={handleSelectChange}
                     required
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="vendorType">
                       <SelectValue placeholder="Select vendor type" />
                     </SelectTrigger>
                     <SelectContent>
