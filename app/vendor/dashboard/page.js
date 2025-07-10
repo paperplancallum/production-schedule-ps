@@ -38,7 +38,7 @@ export default async function VendorDashboard() {
         )
       )
     `)
-    .eq('id', user.id)
+    .eq('user_id', user.id)
     .single()
 
   async function signOut() {

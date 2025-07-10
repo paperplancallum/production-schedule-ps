@@ -159,7 +159,7 @@ function VendorSignupForm() {
       const { error: updateError } = await supabase
         .from('vendors')
         .update({
-          id: userId,
+          user_id: userId,
           vendor_status: 'accepted',
           accepted_at: new Date().toISOString()
         })
