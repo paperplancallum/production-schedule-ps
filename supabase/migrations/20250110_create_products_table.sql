@@ -29,7 +29,7 @@ CREATE POLICY "Sellers can view own products" ON public.products
     FOR SELECT USING (
         seller_id IN (
             SELECT id FROM public.sellers 
-            WHERE user_id = auth.uid()
+            WHERE id = auth.uid()
         )
     );
 
@@ -38,7 +38,7 @@ CREATE POLICY "Sellers can insert own products" ON public.products
     FOR INSERT WITH CHECK (
         seller_id IN (
             SELECT id FROM public.sellers 
-            WHERE user_id = auth.uid()
+            WHERE id = auth.uid()
         )
     );
 
@@ -47,7 +47,7 @@ CREATE POLICY "Sellers can update own products" ON public.products
     FOR UPDATE USING (
         seller_id IN (
             SELECT id FROM public.sellers 
-            WHERE user_id = auth.uid()
+            WHERE id = auth.uid()
         )
     );
 
@@ -56,7 +56,7 @@ CREATE POLICY "Sellers can delete own products" ON public.products
     FOR DELETE USING (
         seller_id IN (
             SELECT id FROM public.sellers 
-            WHERE user_id = auth.uid()
+            WHERE id = auth.uid()
         )
     );
 

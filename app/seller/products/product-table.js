@@ -650,15 +650,166 @@ export function ProductTable() {
         </SheetContent>
       </Sheet>
 
-      <DataTable
-        columns={columns}
-        data={products}
-        searchKey="product_name"
-        meta={{
-          onEditProduct: openEditSheet,
-          onDeleteProduct: handleDeleteProduct,
-        }}
-      />
+      {loading ? (
+        <div className="flex items-center justify-center p-8">
+          <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
+        </div>
+      ) : products.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-12 text-center">
+          <div className="rounded-full bg-slate-100 p-4 mb-4">
+            <Plus className="h-8 w-8 text-slate-400" />
+          </div>
+          <h3 className="text-lg font-medium text-slate-900 mb-2">No products yet</h3>
+          <p className="text-slate-600 mb-4">Get started by adding your first product</p>
+          <Sheet open={isAddingProduct} onOpenChange={setIsAddingProduct}>
+            <SheetTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Your First Product
+              </Button>
+            </SheetTrigger>
+            <SheetContent>
+              <SheetHeader>
+                <SheetTitle>Add New Product</SheetTitle>
+                <SheetDescription>
+                  Enter the details for your new product.
+                </SheetDescription>
+              </SheetHeader>
+              <form onSubmit={handleAddProduct} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="product_name">Product Name *</Label>
+                  <Input
+                    id="product_name"
+                    value={formData.product_name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, product_name: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sku">SKU</Label>
+                  <Input
+                    id="sku"
+                    value={formData.sku}
+                    onChange={(e) =>
+                      setFormData({ ...formData, sku: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Input
+                    id="category"
+                    value={formData.category}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Price</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      step="0.01"
+                      value={formData.price}
+                      onChange={(e) =>
+                        setFormData({ ...formData, price: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cost">Cost</Label>
+                    <Input
+                      id="cost"
+                      type="number"
+                      step="0.01"
+                      value={formData.cost}
+                      onChange={(e) =>
+                        setFormData({ ...formData, cost: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="stock_quantity">Stock Quantity</Label>
+                    <Input
+                      id="stock_quantity"
+                      type="number"
+                      value={formData.stock_quantity}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          stock_quantity: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unit_of_measure">Unit of Measure</Label>
+                    <Input
+                      id="unit_of_measure"
+                      value={formData.unit_of_measure}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          unit_of_measure: e.target.value,
+                        })
+                      }
+                      placeholder="e.g., pcs, kg, lbs"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, status: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="draft">Draft</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" className="w-full">
+                  Add Product
+                </Button>
+              </form>
+            </SheetContent>
+          </Sheet>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={products}
+          searchKey="product_name"
+          meta={{
+            onEditProduct: openEditSheet,
+            onDeleteProduct: handleDeleteProduct,
+          }}
+        />
+      )}
     </div>
   )
 }
