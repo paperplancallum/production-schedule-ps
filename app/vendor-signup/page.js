@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
-export default function VendorSignupPage() {
+function VendorSignupForm() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = searchParams.get('token')
@@ -318,5 +318,17 @@ export default function VendorSignupPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function VendorSignupPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    }>
+      <VendorSignupForm />
+    </Suspense>
   )
 }
