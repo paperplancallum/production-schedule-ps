@@ -538,7 +538,7 @@ export default function VendorTable({ initialVendors, currentUserId }) {
                       id="vendorType"
                       value={vendorTypes.find(t => t.value === newVendor.vendorType)?.label || newVendor.vendorType}
                       disabled
-                      className="bg-muted cursor-not-allowed"
+                      className="bg-gray-100 text-gray-700 cursor-not-allowed"
                       readOnly
                     />
                   </div>
