@@ -1,3 +1,5 @@
+import { ProductTable } from './product-table'
+
 export default function ProductsPage() {
   return (
     <div className="p-6">
@@ -10,10 +12,8 @@ export default function ProductsPage() {
         </p>
       </div>
 
-      <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 p-8">
-        <p className="text-slate-600 dark:text-slate-400 text-center">
-          Products page coming soon...
-        </p>
+      <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
+        <ProductTable />
       </div>
     </div>
   )

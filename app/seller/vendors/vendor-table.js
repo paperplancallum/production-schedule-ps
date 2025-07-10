@@ -519,13 +519,19 @@ export default function VendorTable({ initialVendors, currentUserId }) {
           <form onSubmit={handleSubmit} className="flex flex-col h-full">
             <div className="space-y-4 px-6 pt-4 pb-4 flex-1 overflow-y-auto">
               <div className="space-y-1">
-                <Label htmlFor="vendorType">Vendor Type</Label>
+                <Label htmlFor="vendorType">
+                  Vendor Type
+                  {editingVendor && (
+                    <span className="text-xs text-muted-foreground ml-2">(Cannot be changed)</span>
+                  )}
+                </Label>
                 <Select
                   value={newVendor.vendorType}
                   onValueChange={handleSelectChange}
                   required
+                  disabled={!!editingVendor}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger disabled={!!editingVendor}>
                     <SelectValue placeholder="Select vendor type" />
                   </SelectTrigger>
                   <SelectContent>
