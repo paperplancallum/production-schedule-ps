@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -28,16 +28,7 @@ export default function VendorSignupPage() {
     lastName: ''
   })
 
-  useEffect(() => {
-    if (token) {
-      verifyInvitation()
-    } else {
-      setError('No invitation token provided')
-      setLoading(false)
-    }
-  }, [token])
-
-  const verifyInvitation = async () => {
+  const verifyInvitation = useCallback(async () => {
     try {
       const supabase = createClient()
       
@@ -89,7 +80,16 @@ export default function VendorSignupPage() {
       setError('Failed to verify invitation')
       setLoading(false)
     }
-  }
+  }, [token])
+
+  useEffect(() => {
+    if (token) {
+      verifyInvitation()
+    } else {
+      setError('No invitation token provided')
+      setLoading(false)
+    }
+  }, [token, verifyInvitation])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -225,9 +225,9 @@ export default function VendorSignupPage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Welcome to {vendor.seller_name}'s Network</CardTitle>
+          <CardTitle>Welcome to {vendor.seller_name}&apos;s Network</CardTitle>
           <CardDescription>
-            You've been invited to join as a {vendor.vendor_type?.replace('_', ' ')}. 
+            You&apos;ve been invited to join as a {vendor.vendor_type?.replace('_', ' ')}. 
             Create your account to get started.
           </CardDescription>
         </CardHeader>
