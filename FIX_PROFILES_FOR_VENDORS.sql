@@ -23,8 +23,7 @@ CREATE POLICY "Users can insert own profile" ON profiles
   WITH CHECK (auth.uid() = id);
 
 -- Ensure the profiles table has all necessary columns
-ALTER TABLE profiles 
-ADD COLUMN IF NOT EXISTS user_type TEXT CHECK (user_type IN ('seller', 'vendor', 'admin'));
+-- Note: user_type already exists as an enum, so we skip adding it
 
 ALTER TABLE profiles
 ADD COLUMN IF NOT EXISTS email TEXT;
@@ -49,7 +48,7 @@ BEGIN
   VALUES (
     new.id,
     new.email,
-    COALESCE(new.raw_user_meta_data->>'user_type', 'vendor'),
+    COALESCE(new.raw_user_meta_data->>'user_type', 'vendor')::user_type,
     now(),
     now()
   )
@@ -76,7 +75,7 @@ INSERT INTO profiles (id, email, user_type, created_at, updated_at)
 SELECT DISTINCT 
   v.user_id,
   v.email,
-  'vendor',
+  'vendor'::user_type,
   NOW(),
   NOW()
 FROM vendors v
@@ -85,5 +84,5 @@ WHERE v.user_id IS NOT NULL
     SELECT 1 FROM profiles p WHERE p.id = v.user_id
   )
 ON CONFLICT (id) DO UPDATE
-SET user_type = 'vendor',
+SET user_type = 'vendor'::user_type,
     updated_at = NOW();
