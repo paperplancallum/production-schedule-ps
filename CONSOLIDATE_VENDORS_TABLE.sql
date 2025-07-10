@@ -32,6 +32,7 @@ BEGIN
       vendor_code TEXT UNIQUE DEFAULT 'V' || LPAD(FLOOR(RANDOM() * 999999)::TEXT, 6, '0'),
       invitation_token UUID,
       invitation_sent_at TIMESTAMP WITH TIME ZONE,
+      accepted_at TIMESTAMP WITH TIME ZONE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
     );

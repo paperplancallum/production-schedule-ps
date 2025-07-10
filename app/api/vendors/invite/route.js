@@ -63,7 +63,10 @@ export async function POST(request) {
     }
 
     // Send invitation email
-    const invitationUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://your-app.com'}/vendor-signup?token=${invitationToken}`
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                    'http://localhost:3000'
+    const invitationUrl = `${baseUrl}/vendor-signup?token=${invitationToken}`
     
     console.log('Attempting to send email to:', vendor.email)
     console.log('Using Resend API key:', process.env.RESEND_API_KEY ? 'Key is set' : 'Key is missing')
