@@ -30,9 +30,10 @@ export async function middleware(request) {
   // Refresh user's session
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Protected routes
-  if (request.nextUrl.pathname.startsWith('/seller') || 
-      request.nextUrl.pathname.startsWith('/vendor')) {
+  // Protected routes (excluding vendor-signup which needs to be accessible for invitations)
+  if ((request.nextUrl.pathname.startsWith('/seller') || 
+       request.nextUrl.pathname.startsWith('/vendor')) &&
+       request.nextUrl.pathname !== '/vendor-signup') {
     if (!user) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
