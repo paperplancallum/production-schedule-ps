@@ -69,8 +69,10 @@ export async function POST(request) {
     console.log('Using Resend API key:', process.env.RESEND_API_KEY ? 'Key is set' : 'Key is missing')
     
     try {
+      // Note: Resend test mode only allows sending to account owner email
+      // For production, verify your domain at resend.com/domains
       const { data: emailData, error: emailError } = await resend.emails.send({
-        from: 'Production Schedule <onboarding@resend.dev>',
+        from: 'onboarding@resend.dev',
         to: vendor.email,
         subject: `${sellerName} invites you to join their vendor network`,
         html: `
@@ -109,7 +111,9 @@ export async function POST(request) {
       
       // Common Resend errors
       let errorDetails = 'Email failed to send'
-      if (emailError?.message?.includes('domain')) {
+      if (emailError?.statusCode === 403 && emailError?.message?.includes('testing emails')) {
+        errorDetails = 'Resend test mode: Can only send to account owner email. Verify a domain for production use.'
+      } else if (emailError?.message?.includes('domain')) {
         errorDetails = 'Email domain not verified with Resend'
       } else if (emailError?.message?.includes('API')) {
         errorDetails = 'Invalid Resend API key'

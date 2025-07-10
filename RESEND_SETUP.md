@@ -1,16 +1,26 @@
 # Resend Email Setup Guide
 
 ## Current Issue
-The vendor invitation emails are failing to send. The vendor status is being updated correctly, but the email delivery is failing.
+Resend is in test mode and only allows sending emails to the account owner's email address (callum@paperplan.co).
 
-## Common Causes & Solutions
+## The Restriction
+```
+You can only send testing emails to your own email address (callum@paperplan.co). 
+To send emails to other recipients, please verify a domain at resend.com/domains
+```
 
-### 1. Domain Verification (Most Likely)
-Resend requires domain verification to send emails from custom domains. Currently using `onboarding@resend.dev` which should work for testing.
+## Solutions
 
-**Solution:**
-- Use `onboarding@resend.dev` as the sender (current setup)
-- Or verify your own domain in Resend dashboard
+### For Production Use
+1. Go to https://resend.com/domains
+2. Add and verify your domain (e.g., paperplan.co)
+3. Update the `from` address in the code to use your verified domain
+4. Emails will then work for all recipients
+
+### For Development/Testing
+- Emails will only send to callum@paperplan.co
+- Use the "Copy invitation link" feature for other vendors
+- The system still updates vendor status correctly
 
 ### 2. API Key Issues
 Your API key might have restrictions or be invalid.
@@ -33,8 +43,6 @@ When email fails, the system now:
 2. Shows a warning toast with an option to copy the invitation link
 3. You can manually send this link to the vendor
 
-## Testing Email Preview
-Visit `/api/vendors/invite/preview` to see how the invitation email looks.
 
 ## Alternative Solutions
 
