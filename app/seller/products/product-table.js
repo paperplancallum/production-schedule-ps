@@ -34,7 +34,6 @@ import {
 } from '@/components/ui/select'
 import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
 
 const columns = [
   {
@@ -123,7 +122,12 @@ const columns = [
     ),
     cell: ({ row }) => {
       const date = row.getValue('created_at')
-      return date ? format(new Date(date), 'MMM d, yyyy') : '-'
+      if (!date) return '-'
+      return new Date(date).toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      })
     },
   },
   {
