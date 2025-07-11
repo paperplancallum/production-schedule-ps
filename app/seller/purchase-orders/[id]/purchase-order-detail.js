@@ -77,12 +77,13 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
       })
 
       if (response.ok) {
-        const updatedOrder = await response.json()
-        console.log('Updated order from PATCH:', updatedOrder)
-        console.log('Status history:', updatedOrder.status_history)
-        // The PATCH endpoint now returns the complete order with status history
-        setOrder(updatedOrder)
+        // Status update was successful
         toast.success('Status updated successfully')
+        
+        // Reload the page to get fresh data with all relations
+        setTimeout(() => {
+          window.location.reload()
+        }, 500) // Small delay to ensure toast is visible
       } else {
         const error = await response.json()
         toast.error(`Error updating status: ${error.error}`)

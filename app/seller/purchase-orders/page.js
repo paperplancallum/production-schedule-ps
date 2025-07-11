@@ -109,8 +109,33 @@ export default function PurchaseOrdersPage() {
   }
 
   const handleSelectOrder = (orderId, checked) => {
+    const order = orders.find(o => o.id === orderId)
+    
     if (checked) {
-      setSelectedOrders([...selectedOrders, orderId])
+      // Check if order status allows inspection
+      if (order.status === 'draft') {
+        toast.error('Draft orders cannot be scheduled for inspection')
+        return
+      }
+      if (order.status === 'cancelled') {
+        toast.error('Cancelled orders cannot be scheduled for inspection')
+        return
+      }
+      
+      // If this is the first selection, just add it
+      if (selectedOrders.length === 0) {
+        setSelectedOrders([orderId])
+      } else {
+        // Check if all currently selected orders have the same supplier as this one
+        const selectedOrdersData = orders.filter(o => selectedOrders.includes(o.id))
+        const currentSupplierId = selectedOrdersData[0]?.supplier_id
+        
+        if (order.supplier_id === currentSupplierId) {
+          setSelectedOrders([...selectedOrders, orderId])
+        } else {
+          toast.error('You can only select orders from the same supplier for inspection')
+        }
+      }
     } else {
       setSelectedOrders(selectedOrders.filter(id => id !== orderId))
     }
@@ -118,7 +143,24 @@ export default function PurchaseOrdersPage() {
 
   const handleSelectAll = (checked) => {
     if (checked) {
-      setSelectedOrders(filteredOrders.map(order => order.id))
+      // Filter out draft and cancelled orders
+      const selectableOrders = filteredOrders.filter(order => 
+        order.status !== 'draft' && order.status !== 'cancelled'
+      )
+      
+      if (selectableOrders.length === 0) {
+        toast.error('No orders available for inspection')
+        return
+      }
+      
+      // Check if all selectable orders have the same supplier
+      const supplierIds = [...new Set(selectableOrders.map(order => order.supplier_id))]
+      
+      if (supplierIds.length === 1) {
+        setSelectedOrders(selectableOrders.map(order => order.id))
+      } else {
+        toast.error('Cannot select all - orders have different suppliers. Select orders from one supplier at a time.')
+      }
     } else {
       setSelectedOrders([])
     }
@@ -295,16 +337,37 @@ export default function PurchaseOrdersPage() {
             ) : (
               filteredOrders.map((order) => {
                 const StatusIcon = statusConfig[order.status]?.icon || FileText
+                const isSelected = selectedOrders.includes(order.id)
+                
+                // Determine if this order can be selected
+                let canSelect = true
+                let disabledReason = ''
+                
+                // Check if order status allows inspection
+                if (order.status === 'draft' || order.status === 'cancelled') {
+                  canSelect = false
+                  disabledReason = order.status === 'draft' ? 'Draft orders cannot be inspected' : 'Cancelled orders cannot be inspected'
+                } else if (selectedOrders.length > 0 && !isSelected) {
+                  const selectedOrdersData = orders.filter(o => selectedOrders.includes(o.id))
+                  const currentSupplierId = selectedOrdersData[0]?.supplier_id
+                  
+                  if (order.supplier_id !== currentSupplierId) {
+                    canSelect = false
+                    disabledReason = 'Different supplier'
+                  }
+                }
+                
                 return (
                   <TableRow
                     key={order.id}
-                    className="hover:bg-gray-50 dark:hover:bg-slate-800"
+                    className={`hover:bg-gray-50 dark:hover:bg-slate-800 ${!canSelect && !isSelected ? 'opacity-50' : ''}`}
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
-                        checked={selectedOrders.includes(order.id)}
+                        checked={isSelected}
                         onCheckedChange={(checked) => handleSelectOrder(order.id, checked)}
                         aria-label={`Select ${order.po_number}`}
+                        disabled={!canSelect && !isSelected}
                       />
                     </TableCell>
                     <TableCell 

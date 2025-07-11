@@ -26,25 +26,21 @@ CREATE OR REPLACE FUNCTION generate_inspection_number()
 RETURNS TRIGGER AS $$
 DECLARE
   new_number TEXT;
-  year_part TEXT;
   sequence_number INTEGER;
 BEGIN
-  -- Get current year
-  year_part := EXTRACT(YEAR FROM CURRENT_DATE)::TEXT;
-  
-  -- Get the next sequence number for this year
+  -- Get the next sequence number
   SELECT COALESCE(MAX(
     CAST(
-      SUBSTRING(inspection_number FROM 'INS-' || year_part || '-(\d+)$') 
+      SUBSTRING(inspection_number FROM 'INS-(\d+)$') 
       AS INTEGER
     )
-  ), 0) + 1
+  ), 1000) + 1
   INTO sequence_number
   FROM inspections
-  WHERE inspection_number LIKE 'INS-' || year_part || '-%';
+  WHERE inspection_number LIKE 'INS-%';
   
   -- Generate the inspection number
-  new_number := 'INS-' || year_part || '-' || LPAD(sequence_number::TEXT, 4, '0');
+  new_number := 'INS-' || sequence_number::TEXT;
   
   NEW.inspection_number := new_number;
   RETURN NEW;

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { DataTable } from '@/components/ui/data-table'
-import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,26 +14,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Plus, MoreHorizontal, RefreshCw, Eye, Calendar, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react'
+import { Plus, MoreHorizontal, RefreshCw, Eye, Calendar, CheckCircle, XCircle, Clock, AlertCircle, ChevronRight, ChevronDown, Building, Package, Trash2, Download } from 'lucide-react'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const statusConfig = {
   pending: { label: 'Pending', color: 'secondary', icon: Clock },
@@ -49,25 +40,16 @@ const inspectionTypes = [
 ]
 
 export default function InspectionsPage() {
+  const router = useRouter()
   const [inspections, setInspections] = useState([])
   const [loading, setLoading] = useState(true)
-  const [isAddingInspection, setIsAddingInspection] = useState(false)
-  const [purchaseOrders, setPurchaseOrders] = useState([])
-  const [inspectionAgents, setInspectionAgents] = useState([])
+  const [expandedRows, setExpandedRows] = useState([])
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [inspectionToDelete, setInspectionToDelete] = useState(null)
   const supabase = createClient()
-  
-  const [formData, setFormData] = useState({
-    purchase_order_id: '',
-    inspection_agent_id: '',
-    inspection_type: '',
-    scheduled_date: '',
-    notes: ''
-  })
 
   useEffect(() => {
     fetchInspections()
-    fetchPurchaseOrders()
-    fetchInspectionAgents()
   }, [])
 
   const fetchInspections = async () => {
@@ -85,11 +67,22 @@ export default function InspectionsPage() {
           *,
           purchase_order:purchase_orders(
             id,
-            po_number
+            po_number,
+            order_date,
+            goods_ready_date,
+            total_amount,
+            supplier:vendors!supplier_id(
+              id,
+              vendor_name,
+              vendor_code,
+              country
+            )
           ),
-          inspection_agent:vendors(
+          inspection_agent:vendors!inspection_agent_id(
             id,
-            vendor_name
+            vendor_name,
+            contact_name,
+            email
           )
         `)
         .eq('seller_id', userData.user.id)
@@ -108,7 +101,9 @@ export default function InspectionsPage() {
         return
       }
 
-      setInspections(data || [])
+      // Group inspections by matching criteria (same agent, date, and notes)
+      const groupedInspections = groupInspectionsByBatch(data || [])
+      setInspections(groupedInspections)
     } catch (error) {
       console.error('Error in fetchInspections:', error)
       // Don't show error toast for missing table
@@ -121,194 +116,161 @@ export default function InspectionsPage() {
     }
   }
 
-  const fetchPurchaseOrders = async () => {
-    try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) return
+  const groupInspectionsByBatch = (inspections) => {
+    const groups = []
+    const processed = new Set()
 
-      const { data, error } = await supabase
-        .from('purchase_orders')
-        .select('id, po_number')
-        .eq('seller_id', userData.user.id)
-        .order('created_at', { ascending: false })
+    inspections.forEach(inspection => {
+      if (processed.has(inspection.id)) return
 
-      if (!error && data) {
-        setPurchaseOrders(data)
+      // Find all inspections with same agent, date, and notes (indicating they were scheduled together)
+      const batch = inspections.filter(i => 
+        i.inspection_agent_id === inspection.inspection_agent_id &&
+        i.scheduled_date === inspection.scheduled_date &&
+        i.notes === inspection.notes &&
+        i.inspection_type === inspection.inspection_type &&
+        // Check if they were created within 5 seconds of each other
+        Math.abs(new Date(i.created_at) - new Date(inspection.created_at)) < 5000
+      )
+
+      // Mark all as processed
+      batch.forEach(i => processed.add(i.id))
+
+      // Use the first inspection as the main one, but include all purchase orders
+      const groupedInspection = {
+        ...inspection,
+        purchase_orders: batch.map(i => i.purchase_order).filter(Boolean),
+        inspection_numbers: batch.map(i => i.inspection_number),
+        all_inspections: batch
       }
-    } catch (error) {
-      console.error('Error fetching purchase orders:', error)
-    }
+
+      groups.push(groupedInspection)
+    })
+
+    return groups
   }
 
-  const fetchInspectionAgents = async () => {
-    try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) return
 
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('id, vendor_name')
-        .eq('seller_id', userData.user.id)
-        .eq('vendor_type', 'inspection_agent')
-        .eq('vendor_status', 'accepted')
-        .order('vendor_name')
-
-      if (!error && data) {
-        setInspectionAgents(data)
-      }
-    } catch (error) {
-      console.error('Error fetching inspection agents:', error)
-    }
+  const toggleRowExpansion = (inspectionId) => {
+    setExpandedRows(prev => 
+      prev.includes(inspectionId) 
+        ? prev.filter(id => id !== inspectionId)
+        : [...prev, inspectionId]
+    )
   }
 
-  const handleAddInspection = async (e) => {
-    e.preventDefault()
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount || 0)
+  }
+
+  const handleDeleteInspection = async () => {
+    if (!inspectionToDelete) return
+
     try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        throw new Error('User not authenticated')
+      // Delete all inspections in the batch
+      const deletePromises = inspectionToDelete.all_inspections.map(inspection =>
+        supabase
+          .from('inspections')
+          .delete()
+          .eq('id', inspection.id)
+      )
+
+      const results = await Promise.all(deletePromises)
+      
+      // Check if any deletions failed
+      const hasError = results.some(result => result.error)
+      
+      if (hasError) {
+        throw new Error('Failed to delete some inspections')
       }
 
-      const { data, error } = await supabase
-        .from('inspections')
-        .insert({
-          seller_id: userData.user.id,
-          purchase_order_id: formData.purchase_order_id,
-          inspection_agent_id: formData.inspection_agent_id,
-          inspection_type: formData.inspection_type,
-          scheduled_date: formData.scheduled_date,
-          notes: formData.notes,
-          status: 'scheduled'
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      toast.success('Inspection scheduled successfully!')
-      setIsAddingInspection(false)
-      setFormData({
-        purchase_order_id: '',
-        inspection_agent_id: '',
-        inspection_type: '',
-        scheduled_date: '',
-        notes: ''
-      })
+      toast.success('Inspection(s) deleted successfully')
+      setDeleteDialogOpen(false)
+      setInspectionToDelete(null)
       fetchInspections()
     } catch (error) {
-      console.error('Error adding inspection:', error)
-      toast.error('Failed to schedule inspection')
+      console.error('Error deleting inspection:', error)
+      toast.error('Failed to delete inspection')
     }
   }
 
-  const columns = [
-    {
-      accessorKey: 'inspection_number',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Inspection #" />
-      ),
-      cell: ({ row }) => (
-        <div className="font-medium">{row.getValue('inspection_number')}</div>
-      ),
-    },
-    {
-      accessorKey: 'purchase_order',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Purchase Order" />
-      ),
-      cell: ({ row }) => {
-        const po = row.getValue('purchase_order')
-        return <div className="text-sm">{po?.po_number || '-'}</div>
-      },
-    },
-    {
-      accessorKey: 'inspection_type',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Type" />
-      ),
-      cell: ({ row }) => {
-        const type = inspectionTypes.find(t => t.value === row.getValue('inspection_type'))
-        return <div className="text-sm">{type?.label || '-'}</div>
-      },
-    },
-    {
-      accessorKey: 'inspection_agent',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Inspector" />
-      ),
-      cell: ({ row }) => {
-        const agent = row.getValue('inspection_agent')
-        return <div className="text-sm">{agent?.vendor_name || '-'}</div>
-      },
-    },
-    {
-      accessorKey: 'scheduled_date',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Scheduled Date" />
-      ),
-      cell: ({ row }) => {
-        const date = row.getValue('scheduled_date')
-        if (!date) return '-'
-        return new Date(date).toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric', 
-          year: 'numeric' 
-        })
-      },
-    },
-    {
-      accessorKey: 'status',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Status" />
-      ),
-      cell: ({ row }) => {
-        const status = row.getValue('status')
-        const config = statusConfig[status] || statusConfig.pending
-        const Icon = config.icon
-        
-        return (
-          <Badge variant={config.color}>
-            <Icon className="h-3 w-3 mr-1" />
-            {config.label}
-          </Badge>
-        )
-      },
-    },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => {
-        const inspection = row.original
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => toast.info('View inspection details')}
-                className="cursor-pointer"
-              >
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => toast.info('Download report')}
-                className="cursor-pointer"
-              >
-                Download Report
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )
-      },
-    },
-  ]
+  const generateInspectionPDF = async (inspection) => {
+    const { jsPDF } = await import('jspdf')
+    const doc = new jsPDF()
+
+    // Add header
+    doc.setFontSize(20)
+    doc.text('Inspection Report', 20, 20)
+    
+    // Add inspection details
+    doc.setFontSize(12)
+    doc.text(`Inspection Number: ${inspection.inspection_number}`, 20, 40)
+    doc.text(`Date: ${inspection.scheduled_date ? new Date(inspection.scheduled_date).toLocaleDateString() : '-'}`, 20, 50)
+    doc.text(`Status: ${statusConfig[inspection.status]?.label || inspection.status}`, 20, 60)
+    doc.text(`Type: Post-Production`, 20, 70)
+    
+    // Add inspector info
+    doc.text('Inspector:', 20, 90)
+    doc.text(inspection.inspection_agent?.vendor_name || '-', 30, 100)
+    if (inspection.inspection_agent?.contact_name) {
+      doc.text(`Contact: ${inspection.inspection_agent.contact_name}`, 30, 110)
+    }
+    
+    // Add supplier info
+    const suppliers = inspection.purchase_orders?.length > 0
+      ? [...new Map(
+          inspection.purchase_orders
+            .filter(po => po?.supplier)
+            .map(po => [po.supplier.id, po.supplier])
+        ).values()]
+      : []
+    
+    let yPos = 130
+    doc.text('Supplier(s):', 20, yPos)
+    suppliers.forEach(supplier => {
+      yPos += 10
+      doc.text(`${supplier.vendor_name} (${supplier.country || '-'})`, 30, yPos)
+    })
+    
+    // Add purchase orders
+    yPos += 20
+    doc.text('Purchase Orders:', 20, yPos)
+    const orders = inspection.purchase_orders?.length > 0 ? inspection.purchase_orders : [inspection.purchase_order]
+    orders.forEach(po => {
+      if (po) {
+        yPos += 10
+        doc.text(`${po.po_number} - ${formatCurrency(po.total_amount)}`, 30, yPos)
+      }
+    })
+    
+    // Add total
+    yPos += 15
+    const total = orders.reduce((sum, po) => sum + (po?.total_amount || 0), 0)
+    doc.setFontSize(14)
+    doc.text(`Total Amount: ${formatCurrency(total)}`, 20, yPos)
+    
+    // Add notes if any
+    if (inspection.notes) {
+      yPos += 20
+      doc.setFontSize(12)
+      doc.text('Notes:', 20, yPos)
+      yPos += 10
+      
+      // Word wrap notes
+      const splitNotes = doc.splitTextToSize(inspection.notes, 170)
+      splitNotes.forEach(line => {
+        doc.text(line, 20, yPos)
+        yPos += 6
+      })
+    }
+    
+    // Save the PDF
+    doc.save(`inspection-${inspection.inspection_number}.pdf`)
+  }
+
 
   return (
     <div className="p-6">
@@ -323,109 +285,6 @@ export default function InspectionsPage() {
 
       <div className="mb-4 flex justify-between items-center">
         <div className="flex gap-2">
-          <Sheet open={isAddingInspection} onOpenChange={setIsAddingInspection}>
-            <SheetTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Schedule Inspection
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle>Schedule New Inspection</SheetTitle>
-                <SheetDescription>
-                  Schedule a quality inspection for a purchase order
-                </SheetDescription>
-              </SheetHeader>
-              <form onSubmit={handleAddInspection} className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="purchase_order">Purchase Order *</Label>
-                  <Select
-                    value={formData.purchase_order_id}
-                    onValueChange={(value) => setFormData({ ...formData, purchase_order_id: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a purchase order" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {purchaseOrders.map(po => (
-                        <SelectItem key={po.id} value={po.id}>
-                          {po.po_number}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="inspection_type">Inspection Type *</Label>
-                  <Select
-                    value={formData.inspection_type}
-                    onValueChange={(value) => setFormData({ ...formData, inspection_type: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select inspection type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {inspectionTypes.map(type => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="inspection_agent">Inspection Agency *</Label>
-                  <Select
-                    value={formData.inspection_agent_id}
-                    onValueChange={(value) => setFormData({ ...formData, inspection_agent_id: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select inspection agency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {inspectionAgents.map(agent => (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          {agent.vendor_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="scheduled_date">Scheduled Date *</Label>
-                  <Input
-                    id="scheduled_date"
-                    type="date"
-                    value={formData.scheduled_date}
-                    onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Additional notes or requirements..."
-                    rows={3}
-                  />
-                </div>
-
-                <Button type="submit" className="w-full">
-                  Schedule Inspection
-                </Button>
-              </form>
-            </SheetContent>
-          </Sheet>
           <Button
             variant="outline"
             size="icon"
@@ -437,31 +296,270 @@ export default function InspectionsPage() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
-        {loading ? (
-          <div className="flex items-center justify-center p-8">
-            <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
+      {loading ? (
+        <div className="flex items-center justify-center p-8">
+          <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
+        </div>
+      ) : inspections.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-12 text-center">
+          <div className="rounded-full bg-slate-100 p-4 mb-4">
+            <AlertCircle className="h-8 w-8 text-slate-400" />
           </div>
-        ) : inspections.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center">
-            <div className="rounded-full bg-slate-100 p-4 mb-4">
-              <AlertCircle className="h-8 w-8 text-slate-400" />
-            </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-2">No inspections yet</h3>
-            <p className="text-slate-600 mb-4">Schedule your first quality inspection</p>
-            <Button onClick={() => setIsAddingInspection(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Schedule Inspection
+          <h3 className="text-lg font-medium text-slate-900 mb-2">No inspections yet</h3>
+          <p className="text-slate-600 mb-4">Schedule inspections from the Purchase Orders page</p>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12"></TableHead>
+                <TableHead>Inspection #</TableHead>
+                <TableHead>Purchase Order</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Inspector</TableHead>
+                <TableHead>Scheduled Date</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {inspections.map((inspection) => {
+                const isExpanded = expandedRows.includes(inspection.id)
+                const StatusIcon = statusConfig[inspection.status]?.icon || Clock
+                const type = inspectionTypes.find(t => t.value === inspection.inspection_type)
+                
+                return (
+                  <React.Fragment key={inspection.id}>
+                    <TableRow>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => toggleRowExpansion(inspection.id)}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {inspection.inspection_number}
+                      </TableCell>
+                      <TableCell>
+                        {inspection.purchase_orders?.length > 1
+                          ? `${inspection.purchase_orders.length} Orders`
+                          : inspection.purchase_order?.po_number || '-'}
+                      </TableCell>
+                      <TableCell>{type?.label || '-'}</TableCell>
+                      <TableCell>{inspection.inspection_agent?.vendor_name || '-'}</TableCell>
+                      <TableCell>
+                        {inspection.scheduled_date
+                          ? new Date(inspection.scheduled_date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={statusConfig[inspection.status]?.color}>
+                          <StatusIcon className="h-3 w-3 mr-1" />
+                          {statusConfig[inspection.status]?.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={() => generateInspectionPDF(inspection)}
+                              className="cursor-pointer"
+                            >
+                              <Download className="mr-2 h-4 w-4" />
+                              Download PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setInspectionToDelete(inspection)
+                                setDeleteDialogOpen(true)
+                              }}
+                              className="cursor-pointer text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="bg-transparent p-4">
+                          <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm p-8">
+                            {/* Header Section */}
+                            <div className="mb-6 flex justify-between items-start">
+                              <div>
+                                <h3 className="text-lg font-semibold mb-2">Inspection Schedule</h3>
+                                {inspection.inspection_numbers?.length > 1 && (
+                                  <div className="flex flex-wrap gap-2 mb-2">
+                                    {inspection.inspection_numbers.map((num, idx) => (
+                                      <Badge key={idx} variant="outline" className="text-xs">
+                                        {num}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
+                                <div className="text-sm text-muted-foreground space-y-1">
+                                  <div>Scheduled: {inspection.scheduled_date ? new Date(inspection.scheduled_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '-'}</div>
+                                  <div>Status: <Badge variant={statusConfig[inspection.status]?.color} className="ml-1">
+                                    {statusConfig[inspection.status]?.label}
+                                  </Badge></div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm text-muted-foreground mb-1">Inspection Agency</div>
+                                <div className="font-medium">{inspection.inspection_agent?.vendor_name || '-'}</div>
+                                {inspection.inspection_agent?.contact_name && (
+                                  <div className="text-sm text-muted-foreground">{inspection.inspection_agent.contact_name}</div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Supplier Section */}
+                            <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-800">
+                              <div className="text-sm font-medium mb-2 text-muted-foreground">SUPPLIER INFORMATION</div>
+                              {(() => {
+                                const suppliers = inspection.purchase_orders?.length > 0
+                                  ? [...new Map(
+                                      inspection.purchase_orders
+                                        .filter(po => po?.supplier)
+                                        .map(po => [po.supplier.id, po.supplier])
+                                    ).values()]
+                                  : [inspection.purchase_order?.supplier].filter(Boolean)
+                                
+                                return suppliers.length > 0 ? (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {suppliers.map((supplier, idx) => (
+                                      <div key={supplier?.id || idx}>
+                                        <div className="font-medium">{supplier?.vendor_name || '-'}</div>
+                                        <div className="text-sm text-muted-foreground">
+                                          {supplier?.vendor_code && <div>Code: {supplier.vendor_code}</div>}
+                                          {supplier?.country && <div>{supplier.country}</div>}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : <div className="text-muted-foreground">No supplier information</div>
+                              })()}
+                            </div>
+
+                            {/* Purchase Orders Table */}
+                            <div className="mb-6">
+                              <div className="text-sm font-medium mb-3 text-muted-foreground">PURCHASE ORDERS</div>
+                              <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+                                <table className="w-full">
+                                  <thead className="bg-slate-50 dark:bg-slate-900 border-b">
+                                    <tr>
+                                      <th className="text-left p-3 text-sm font-medium">PO Number</th>
+                                      <th className="text-left p-3 text-sm font-medium">Order Date</th>
+                                      <th className="text-left p-3 text-sm font-medium">Goods Ready</th>
+                                      <th className="text-right p-3 text-sm font-medium">Amount</th>
+                                      <th className="text-center p-3 text-sm font-medium">Action</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(inspection.purchase_orders?.length > 0 ? inspection.purchase_orders : [inspection.purchase_order]).map((po, idx) => (
+                                      <tr key={po?.id || idx} className="border-b last:border-0">
+                                        <td className="p-3 font-medium">{po?.po_number || '-'}</td>
+                                        <td className="p-3 text-sm">{po?.order_date ? new Date(po.order_date).toLocaleDateString() : '-'}</td>
+                                        <td className="p-3 text-sm">{po?.goods_ready_date ? new Date(po.goods_ready_date).toLocaleDateString() : '-'}</td>
+                                        <td className="p-3 text-right font-medium">{formatCurrency(po?.total_amount)}</td>
+                                        <td className="p-3 text-center">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => router.push(`/seller/purchase-orders/${po?.id}`)}
+                                          >
+                                            View
+                                          </Button>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                  <tfoot className="bg-slate-50 dark:bg-slate-900 border-t">
+                                    <tr>
+                                      <td colSpan={3} className="p-3 text-right font-medium">Total Amount:</td>
+                                      <td className="p-3 text-right font-bold text-lg">
+                                        {formatCurrency(
+                                          (inspection.purchase_orders?.length > 0 
+                                            ? inspection.purchase_orders 
+                                            : [inspection.purchase_order]
+                                          ).reduce((sum, po) => sum + (po?.total_amount || 0), 0)
+                                        )}
+                                      </td>
+                                      <td></td>
+                                    </tr>
+                                  </tfoot>
+                                </table>
+                              </div>
+                            </div>
+
+                            {/* Notes Section */}
+                            {inspection.notes && (
+                              <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                                <div className="text-sm font-medium mb-1 text-amber-800 dark:text-amber-200">Notes</div>
+                                <div className="text-sm text-amber-700 dark:text-amber-300">{inspection.notes}</div>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Inspection</DialogTitle>
+            <DialogDescription>
+              {inspectionToDelete?.purchase_orders?.length > 1 
+                ? `This will delete all ${inspectionToDelete.purchase_orders.length} inspections in this batch. This action cannot be undone.`
+                : 'Are you sure you want to delete this inspection? This action cannot be undone.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
             </Button>
-          </div>
-        ) : (
-          <DataTable
-            columns={columns}
-            data={inspections}
-            searchKey="inspection_number"
-          />
-        )}
-      </div>
+            <Button
+              onClick={handleDeleteInspection}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

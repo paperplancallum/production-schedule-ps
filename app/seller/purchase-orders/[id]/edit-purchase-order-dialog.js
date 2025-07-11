@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
+import { toast } from 'sonner'
 
 export default function EditPurchaseOrderDialog({ 
   open, 
@@ -231,9 +232,14 @@ export default function EditPurchaseOrderDialog({
       })
 
       if (response.ok) {
-        const updatedOrder = await response.json()
-        onSuccess(updatedOrder)
+        // Update was successful
+        toast.success('Order updated successfully')
         onOpenChange(false)
+        
+        // Reload the page to get fresh data with all relations
+        setTimeout(() => {
+          window.location.reload()
+        }, 500) // Small delay to ensure toast is visible
       } else {
         const error = await response.json()
         alert(`Error updating order: ${error.error}`)
