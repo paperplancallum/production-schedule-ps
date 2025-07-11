@@ -335,11 +335,11 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
 
       // If this is the primary supplier, update the product price with the default tier
       if (editingSupplier.is_primary) {
-        const defaultTier = tierData.find(t => t.is_default)
+        const defaultTier = validTiers.find(t => t.is_default === true)
         if (defaultTier) {
           const { error: priceError } = await supabase
             .from('products')
-            .update({ price: defaultTier.unit_price })
+            .update({ price: parseFloat(defaultTier.unit_price) })
             .eq('id', productId)
           
           if (priceError) {

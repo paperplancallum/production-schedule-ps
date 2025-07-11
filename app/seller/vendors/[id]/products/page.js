@@ -25,14 +25,15 @@ export default async function SupplierProductsPage({ params }) {
     .select(`
       *,
       product_suppliers!inner (
-        supplier_id,
-        price_per_unit,
-        moq,
-        lead_time_days
+        vendor_id,
+        unit_price,
+        minimum_order_quantity,
+        lead_time_days,
+        is_primary
       )
     `)
     .eq('seller_id', user.id)
-    .eq('product_suppliers.supplier_id', params.id)
+    .eq('product_suppliers.vendor_id', params.id)
     .order('created_at', { ascending: false })
 
   if (productsError) {
@@ -43,7 +44,7 @@ export default async function SupplierProductsPage({ params }) {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">
-          Products from {vendor.company_name}
+          Products from {vendor.vendor_name}
         </h1>
         <p className="mt-1 text-sm text-gray-500">
           Manage products supplied by this vendor
