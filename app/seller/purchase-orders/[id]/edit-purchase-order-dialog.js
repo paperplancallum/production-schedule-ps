@@ -128,6 +128,23 @@ export default function EditPurchaseOrderDialog({
           price_tier: tier
         }
       }
+    } else if (field === 'quantity') {
+      // When quantity changes, check if we need to update the price tier
+      newItems[index][field] = value
+      
+      const priceTiers = getPriceTiers(newItems[index])
+      if (priceTiers.length > 0) {
+        // Find the appropriate price tier based on quantity
+        const applicableTier = priceTiers
+          .filter(tier => tier.minimum_order_quantity <= value)
+          .sort((a, b) => b.minimum_order_quantity - a.minimum_order_quantity)[0]
+        
+        if (applicableTier && applicableTier.id !== newItems[index].price_tier_id) {
+          newItems[index].price_tier_id = applicableTier.id
+          newItems[index].unit_price = applicableTier.unit_price
+          newItems[index].price_tier = applicableTier
+        }
+      }
     } else {
       newItems[index][field] = value
     }
@@ -145,6 +162,22 @@ export default function EditPurchaseOrderDialog({
       if (!item.product_id || item.quantity <= 0) {
         alert('Please select a product and enter a valid quantity for all items')
         return false
+      }
+      
+      // Validate MOQ for selected price tier
+      if (item.price_tier && item.price_tier.minimum_order_quantity) {
+        if (item.quantity < item.price_tier.minimum_order_quantity) {
+          alert(`Quantity for ${item.product_name || 'product'} must be at least ${item.price_tier.minimum_order_quantity} units (selected price tier MOQ)`)
+          return false
+        }
+      }
+      
+      // Also validate supplier MOQ
+      if (item.product_supplier && item.product_supplier.moq) {
+        if (item.quantity < item.product_supplier.moq) {
+          alert(`Quantity for ${item.product_name || 'product'} must be at least ${item.product_supplier.moq} units (supplier MOQ)`)
+          return false
+        }
       }
     }
 
@@ -322,10 +355,23 @@ export default function EditPurchaseOrderDialog({
 
                       {/* Quantity */}
                       <div>
-                        <Label>Quantity</Label>
+                        <Label>
+                          Quantity
+                          {(item.price_tier?.minimum_order_quantity || item.product_supplier?.moq) && (
+                            <span className="text-xs text-gray-500 ml-1">
+                              (Min: {Math.max(
+                                item.price_tier?.minimum_order_quantity || 0,
+                                item.product_supplier?.moq || 0
+                              )})
+                            </span>
+                          )}
+                        </Label>
                         <Input
                           type="number"
-                          min="1"
+                          min={Math.max(
+                            item.price_tier?.minimum_order_quantity || 1,
+                            item.product_supplier?.moq || 1
+                          )}
                           value={item.quantity}
                           onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
                         />
@@ -334,13 +380,16 @@ export default function EditPurchaseOrderDialog({
                       {/* Unit Price */}
                       <div>
                         <Label>Unit Price</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={item.unit_price}
-                          readOnly
-                          className="bg-gray-50"
-                        />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.unit_price}
+                            readOnly
+                            className="bg-gray-50 pl-7"
+                          />
+                        </div>
                       </div>
                     </div>
 
