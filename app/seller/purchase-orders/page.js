@@ -179,6 +179,12 @@ export default function PurchaseOrdersPage() {
     if (inspectionMode) {
       // In inspection mode, apply inspection-specific validation
       if (checked) {
+        // Check if inspection is required
+        if (order.inspection_required === false) {
+          toast.error('Inspection is not required for this order')
+          return
+        }
+        
         // Check if order already has an inspection
         const hasInspection = inspections.some(i => i.purchase_order_id === orderId)
         if (hasInspection) {
@@ -246,10 +252,11 @@ export default function PurchaseOrdersPage() {
 
   const handleSelectAll = (checked) => {
     if (checked) {
-      // Filter out draft, cancelled orders, and orders with inspections
+      // Filter out draft, cancelled orders, orders with inspections, and orders not requiring inspection
       const selectableOrders = filteredOrders.filter(order => 
         order.status !== 'draft' && 
         order.status !== 'cancelled' &&
+        order.inspection_required !== false &&
         !inspections.some(i => i.purchase_order_id === order.id)
       )
       
@@ -579,7 +586,10 @@ export default function PurchaseOrdersPage() {
                 
                 if (inspectionMode) {
                   // In inspection mode, apply restrictions
-                  if (orderInspection) {
+                  if (order.inspection_required === false) {
+                    canSelect = false
+                    disabledReason = 'Inspection not required'
+                  } else if (orderInspection) {
                     canSelect = false
                     disabledReason = 'Already has inspection'
                   } else if (order.status === 'draft' || order.status === 'cancelled') {
@@ -667,7 +677,12 @@ export default function PurchaseOrdersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="cursor-pointer" onClick={() => handleRowClick(order.id)}>
-                      {orderInspection ? (
+                      {order.inspection_required === false ? (
+                        <Badge variant="secondary" className="text-xs font-medium">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Not Required
+                        </Badge>
+                      ) : orderInspection ? (
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary" className="text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800">
                             <Eye className="h-3 w-3 mr-1" />

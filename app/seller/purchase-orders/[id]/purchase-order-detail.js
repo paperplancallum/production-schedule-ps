@@ -21,7 +21,8 @@ import {
   Edit,
   Clock,
   AlertCircle,
-  ArrowDownToLine
+  ArrowDownToLine,
+  ClipboardCheck
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -40,6 +41,7 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [hasTransfer, setHasTransfer] = useState(false)
   const [checkingTransfer, setCheckingTransfer] = useState(true)
+  const [inspectionRequired, setInspectionRequired] = useState(order.inspection_required !== false)
 
   const statusConfig = {
     draft: { label: 'Draft', color: 'secondary', icon: FileText },
@@ -388,6 +390,40 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
            (order.status === 'approved' || order.status === 'in_progress' || order.status === 'complete')
   }
 
+  const handleToggleInspectionRequired = async () => {
+    setLoading(true)
+    try {
+      const newValue = !inspectionRequired
+      
+      const response = await fetch(`/api/purchase-orders/${order.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ inspection_required: newValue })
+      })
+
+      if (response.ok) {
+        setInspectionRequired(newValue)
+        setOrder(prev => ({ ...prev, inspection_required: newValue }))
+        toast.success(`Inspection ${newValue ? 'required' : 'not required'} for this order`)
+      } else {
+        const error = await response.json()
+        toast.error(`Error updating inspection requirement: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error updating inspection requirement:', error)
+      toast.error('Failed to update inspection requirement')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const canToggleInspection = () => {
+    // Can toggle if order is not complete or cancelled
+    return order.status !== 'complete' && order.status !== 'cancelled'
+  }
+
   const StatusIcon = statusConfig[order.status]?.icon || FileText
   const nextStatuses = getNextStatuses()
 
@@ -438,6 +474,16 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
+            {canToggleInspection() && (
+              <Button 
+                variant={inspectionRequired ? "outline" : "secondary"}
+                onClick={handleToggleInspectionRequired} 
+                disabled={loading}
+              >
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                {inspectionRequired ? 'Inspection Not Required' : 'Inspection Required'}
+              </Button>
+            )}
             {canReceiveInventory() && (
               <Button 
                 onClick={handleReceiveInventory} 
@@ -590,6 +636,33 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
               <CardTitle>Order Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Inspection Status */}
+              <div className="pb-4 border-b">
+                <p className="text-sm text-gray-500 mb-2">Inspection Status</p>
+                {!inspectionRequired ? (
+                  <Badge variant="secondary" className="flex items-center gap-1 w-full justify-center py-2">
+                    <XCircle className="h-4 w-4" />
+                    Not Required
+                  </Badge>
+                ) : (
+                  <Badge variant="blue" className="flex items-center gap-1 w-full justify-center py-2">
+                    <ClipboardCheck className="h-4 w-4" />
+                    Required
+                  </Badge>
+                )}
+                {canToggleInspection() && (
+                  <Button 
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={handleToggleInspectionRequired}
+                    disabled={loading}
+                  >
+                    {inspectionRequired ? 'Mark as Not Required' : 'Mark as Required'}
+                  </Button>
+                )}
+              </div>
+
               {/* Transfer Status */}
               {(hasTransfer || canReceiveInventory()) && (
                 <div className="pb-4 border-b">
