@@ -446,12 +446,12 @@ function ProductSuppliers({ productId, productName }) {
                           {supplier.supplier_price_tiers?.length > 0 ? (
                             <div className="space-y-1">
                               {supplier.supplier_price_tiers.map((tier, tierIndex) => (
-                                <div key={tier.id} className="flex items-center gap-4 text-sm">
+                                <div key={tier.id} className="flex items-center gap-2 text-sm">
+                                  <span className="text-slate-600">MOQ: {tier.minimum_order_quantity}</span>
+                                  <span className="text-slate-900 font-medium">${parseFloat(tier.unit_price).toFixed(2)}/unit</span>
                                   {tier.is_default && (
                                     <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" title="Default tier" />
                                   )}
-                                  <span className="text-slate-600">MOQ: {tier.minimum_order_quantity}</span>
-                                  <span className="text-slate-900 font-medium">${parseFloat(tier.unit_price).toFixed(2)}/unit</span>
                                 </div>
                               ))}
                             </div>
