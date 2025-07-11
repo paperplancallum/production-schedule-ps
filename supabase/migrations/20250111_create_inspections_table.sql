@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS inspections (
   seller_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   purchase_order_id UUID REFERENCES purchase_orders(id) ON DELETE CASCADE NOT NULL,
   inspection_agent_id UUID REFERENCES vendors(id) ON DELETE SET NULL,
-  inspection_type TEXT NOT NULL CHECK (inspection_type IN ('pre_production', 'during_production', 'pre_shipment', 'container_loading', 'other')),
+  inspection_type TEXT NOT NULL DEFAULT 'post_production' CHECK (inspection_type IN ('post_production')),
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'scheduled', 'in_progress', 'completed', 'failed', 'cancelled')),
   scheduled_date DATE,
   actual_date DATE,

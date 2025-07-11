@@ -45,11 +45,7 @@ const statusConfig = {
 }
 
 const inspectionTypes = [
-  { value: 'pre_production', label: 'Pre-Production' },
-  { value: 'during_production', label: 'During Production' },
-  { value: 'pre_shipment', label: 'Pre-Shipment' },
-  { value: 'container_loading', label: 'Container Loading' },
-  { value: 'other', label: 'Other' }
+  { value: 'post_production', label: 'Post-Production' }
 ]
 
 export default function InspectionsPage() {

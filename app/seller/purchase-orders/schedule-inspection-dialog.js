@@ -15,11 +15,7 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 
 const inspectionTypes = [
-  { value: 'pre_production', label: 'Pre-Production' },
-  { value: 'during_production', label: 'During Production' },
-  { value: 'pre_shipment', label: 'Pre-Shipment' },
-  { value: 'container_loading', label: 'Container Loading' },
-  { value: 'other', label: 'Other' }
+  { value: 'post_production', label: 'Post-Production' }
 ]
 
 export default function ScheduleInspectionDialog({ open, onOpenChange, inspectionGroups, onSuccess }) {
@@ -61,15 +57,15 @@ export default function ScheduleInspectionDialog({ open, onOpenChange, inspectio
 
     const initialData = {}
     inspectionGroups.forEach((group, index) => {
-      // Add 5 days to the latest goods ready date for inspection
+      // Use the latest goods ready date as the inspection date
       const suggestedDate = group.latestGoodsReadyDate 
-        ? new Date(new Date(group.latestGoodsReadyDate).getTime() + 5 * 24 * 60 * 60 * 1000)
+        ? new Date(group.latestGoodsReadyDate)
             .toISOString()
             .split('T')[0]
         : ''
 
       initialData[index] = {
-        inspection_type: 'pre_shipment',
+        inspection_type: 'post_production',
         inspection_agent_id: '',
         scheduled_date: suggestedDate,
         notes: ''
@@ -242,7 +238,7 @@ export default function ScheduleInspectionDialog({ open, onOpenChange, inspectio
                     }
                   />
                   <p className="text-xs text-muted-foreground">
-                    Suggested date is 5 days after goods ready date
+                    Inspection scheduled for when goods are ready
                   </p>
                 </div>
 
