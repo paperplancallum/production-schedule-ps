@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { DataTable } from '@/components/ui/data-table'
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
@@ -41,10 +41,10 @@ function ProductSuppliers({ productId, productName }) {
   const [newSupplier, setNewSupplier] = useState({
     vendor_id: '',
     lead_time_days: '',
-    minimum_order_quantity: '',
-    unit_price: '',
+    price_tiers: [{ minimum_order_quantity: '', unit_price: '' }],
   })
   const [vendors, setVendors] = useState([])
+  const [expandedSuppliers, setExpandedSuppliers] = useState({})
   const supabase = createClient()
 
   useEffect(() => {
@@ -66,6 +66,11 @@ function ProductSuppliers({ productId, productName }) {
             id,
             vendor_name,
             vendor_type
+          ),
+          supplier_price_tiers (
+            id,
+            minimum_order_quantity,
+            unit_price
           )
         `)
         .eq('product_id', productId)
@@ -77,7 +82,15 @@ function ProductSuppliers({ productId, productName }) {
         return
       }
 
-      setSuppliers(data || [])
+      // Sort price tiers by MOQ for each supplier
+      const suppliersWithSortedTiers = (data || []).map(supplier => ({
+        ...supplier,
+        supplier_price_tiers: (supplier.supplier_price_tiers || []).sort(
+          (a, b) => a.minimum_order_quantity - b.minimum_order_quantity
+        )
+      }))
+
+      setSuppliers(suppliersWithSortedTiers)
     } catch (error) {
       console.error('Error fetching suppliers:', error)
       setSuppliers([])
@@ -116,24 +129,58 @@ function ProductSuppliers({ productId, productName }) {
     e.preventDefault()
     
     try {
+      // Validate price tiers
+      const validTiers = newSupplier.price_tiers.filter(
+        tier => tier.minimum_order_quantity && tier.unit_price
+      )
+      
+      if (validTiers.length === 0) {
+        toast.error('Please add at least one price tier')
+        return
+      }
+
+      // Create supplier first
       const supplierData = {
         product_id: productId,
         vendor_id: newSupplier.vendor_id,
         lead_time_days: parseInt(newSupplier.lead_time_days),
-        minimum_order_quantity: parseInt(newSupplier.minimum_order_quantity),
-        unit_price: parseFloat(newSupplier.unit_price),
+        // We'll use the first tier's values for backward compatibility
+        minimum_order_quantity: parseInt(validTiers[0].minimum_order_quantity),
+        unit_price: parseFloat(validTiers[0].unit_price),
       }
 
-      const { error } = await supabase
+      const { data: supplierResult, error: supplierError } = await supabase
         .from('product_suppliers')
         .insert([supplierData])
+        .select()
+        .single()
 
-      if (error) {
-        if (error.code === '23505') {
+      if (supplierError) {
+        if (supplierError.code === '23505') {
           toast.error('This vendor is already a supplier for this product')
           return
         }
-        throw error
+        throw supplierError
+      }
+
+      // Add price tiers
+      const tierData = validTiers.map(tier => ({
+        product_supplier_id: supplierResult.id,
+        minimum_order_quantity: parseInt(tier.minimum_order_quantity),
+        unit_price: parseFloat(tier.unit_price),
+      }))
+
+      const { error: tierError } = await supabase
+        .from('supplier_price_tiers')
+        .insert(tierData)
+
+      if (tierError) {
+        // Rollback supplier if tiers fail
+        await supabase
+          .from('product_suppliers')
+          .delete()
+          .eq('id', supplierResult.id)
+        throw tierError
       }
 
       toast.success('Supplier added successfully')
@@ -141,8 +188,7 @@ function ProductSuppliers({ productId, productName }) {
       setNewSupplier({
         vendor_id: '',
         lead_time_days: '',
-        minimum_order_quantity: '',
-        unit_price: '',
+        price_tiers: [{ minimum_order_quantity: '', unit_price: '' }],
       })
       fetchSuppliers()
     } catch (error) {
@@ -196,31 +242,69 @@ function ProductSuppliers({ productId, productName }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-white">
+                <th className="text-left p-2 font-medium text-slate-700"></th>
                 <th className="text-left p-2 font-medium text-slate-700">Supplier Name</th>
                 <th className="text-left p-2 font-medium text-slate-700">Lead Time (days)</th>
-                <th className="text-left p-2 font-medium text-slate-700">Min Order Qty</th>
-                <th className="text-left p-2 font-medium text-slate-700">Unit Price</th>
+                <th className="text-left p-2 font-medium text-slate-700">Price Tiers</th>
                 <th className="text-left p-2 font-medium text-slate-700">Actions</th>
               </tr>
             </thead>
             <tbody>
               {suppliers.map((supplier, index) => (
-                <tr key={supplier.id} className={`bg-white ${index < suppliers.length - 1 ? 'border-b border-slate-100' : ''}`}>
-                  <td className="p-2 text-slate-900">{supplier.vendors?.vendor_name || 'Unknown'}</td>
-                  <td className="p-2 text-slate-600">{supplier.lead_time_days} days</td>
-                  <td className="p-2 text-slate-600">{supplier.minimum_order_quantity}</td>
-                  <td className="p-2 text-slate-600">${parseFloat(supplier.unit_price).toFixed(2)}</td>
-                  <td className="p-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleDeleteSupplier(supplier.id)}
-                      className="h-7 w-7 p-0 hover:bg-slate-100"
-                    >
-                      <Trash2 className="h-3 w-3 text-slate-500" />
-                    </Button>
-                  </td>
-                </tr>
+                <React.Fragment key={supplier.id}>
+                  <tr className={`bg-white ${index < suppliers.length - 1 || expandedSuppliers[supplier.id] ? 'border-b border-slate-100' : ''}`}>
+                    <td className="p-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setExpandedSuppliers(prev => ({ ...prev, [supplier.id]: !prev[supplier.id] }))}
+                        className="h-6 w-6 p-0"
+                      >
+                        {expandedSuppliers[supplier.id] ? (
+                          <ChevronDown className="h-3 w-3" />
+                        ) : (
+                          <ChevronRight className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </td>
+                    <td className="p-2 text-slate-900">{supplier.vendors?.vendor_name || 'Unknown'}</td>
+                    <td className="p-2 text-slate-600">{supplier.lead_time_days} days</td>
+                    <td className="p-2 text-slate-600">
+                      {supplier.supplier_price_tiers?.length || 0} tier(s)
+                    </td>
+                    <td className="p-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDeleteSupplier(supplier.id)}
+                        className="h-7 w-7 p-0 hover:bg-slate-100"
+                      >
+                        <Trash2 className="h-3 w-3 text-slate-500" />
+                      </Button>
+                    </td>
+                  </tr>
+                  {expandedSuppliers[supplier.id] && (
+                    <tr>
+                      <td colSpan={5} className="p-0">
+                        <div className="bg-slate-50 p-4">
+                          <h5 className="text-sm font-medium text-slate-700 mb-2">Price Tiers</h5>
+                          {supplier.supplier_price_tiers?.length > 0 ? (
+                            <div className="space-y-1">
+                              {supplier.supplier_price_tiers.map((tier, tierIndex) => (
+                                <div key={tier.id} className="flex items-center gap-4 text-sm">
+                                  <span className="text-slate-600">MOQ: {tier.minimum_order_quantity}</span>
+                                  <span className="text-slate-900 font-medium">${parseFloat(tier.unit_price).toFixed(2)}/unit</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-slate-500">No price tiers defined</p>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
@@ -273,25 +357,71 @@ function ProductSuppliers({ productId, productName }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="min_order">Minimum Order Quantity *</Label>
-                <Input
-                  id="min_order"
-                  type="number"
-                  value={newSupplier.minimum_order_quantity}
-                  onChange={(e) => setNewSupplier({ ...newSupplier, minimum_order_quantity: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="unit_price">Unit Price *</Label>
-                <Input
-                  id="unit_price"
-                  type="number"
-                  step="0.01"
-                  value={newSupplier.unit_price}
-                  onChange={(e) => setNewSupplier({ ...newSupplier, unit_price: e.target.value })}
-                  required
-                />
+                <div className="flex justify-between items-center">
+                  <Label>Price Tiers *</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setNewSupplier({
+                        ...newSupplier,
+                        price_tiers: [...newSupplier.price_tiers, { minimum_order_quantity: '', unit_price: '' }]
+                      })
+                    }}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Tier
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {newSupplier.price_tiers.map((tier, index) => (
+                    <div key={index} className="flex gap-2 items-start">
+                      <div className="flex-1">
+                        <Input
+                          type="number"
+                          placeholder="MOQ"
+                          value={tier.minimum_order_quantity}
+                          onChange={(e) => {
+                            const newTiers = [...newSupplier.price_tiers]
+                            newTiers[index].minimum_order_quantity = e.target.value
+                            setNewSupplier({ ...newSupplier, price_tiers: newTiers })
+                          }}
+                          required
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Price"
+                          value={tier.unit_price}
+                          onChange={(e) => {
+                            const newTiers = [...newSupplier.price_tiers]
+                            newTiers[index].unit_price = e.target.value
+                            setNewSupplier({ ...newSupplier, price_tiers: newTiers })
+                          }}
+                          required
+                        />
+                      </div>
+                      {newSupplier.price_tiers.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const newTiers = newSupplier.price_tiers.filter((_, i) => i !== index)
+                            setNewSupplier({ ...newSupplier, price_tiers: newTiers })
+                          }}
+                          className="h-9 w-9 p-0"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500">Add price breaks based on minimum order quantity</p>
               </div>
             </div>
             <div className="px-6 py-4 border-t">

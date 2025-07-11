@@ -40,9 +40,13 @@ This is a Next.js application for managing production schedules, vendors, and pr
 - Each product can have multiple suppliers (vendors of type "supplier")
 - **Supplier Fields**:
   - Lead Time (days)
-  - Minimum Order Quantity
-  - Unit Price
+  - Tiered Pricing (multiple price breaks based on MOQ)
+- **Tiered Pricing**:
+  - Each supplier can have multiple price tiers
+  - Each tier has: Minimum Order Quantity (MOQ) and Unit Price
+  - Expandable view shows all price tiers for each supplier
 - Junction table: `product_suppliers` links products to vendors
+- Price tiers stored in `supplier_price_tiers` table
 - Only shows accepted supplier-type vendors in dropdown
 
 ## Database Schema
@@ -57,7 +61,12 @@ This is a Next.js application for managing production schedules, vendors, and pr
    - Linked to seller via `seller_id`
 4. **product_suppliers**: Links products to vendor suppliers
    - Foreign keys to both products and vendors
-   - Includes pricing and lead time info
+   - Includes lead time info
+   - Legacy pricing fields for backward compatibility
+5. **supplier_price_tiers**: Tiered pricing for product suppliers
+   - Links to product_suppliers
+   - MOQ and unit price per tier
+   - Sorted by MOQ for display
 
 ### RLS (Row Level Security)
 All tables use RLS policies to ensure:
@@ -88,6 +97,7 @@ All tables use RLS policies to ensure:
 - Fixed vendor column name issue (`vendor_status` vs `status`)
 - Added inline duplicate SKU validation
 - Prevented duplicate suppliers per product (filters dropdown)
+- Added tiered pricing for suppliers with MOQ-based price breaks
 
 ### 2025-01-10
 - Initial products implementation
