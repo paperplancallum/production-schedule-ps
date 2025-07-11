@@ -93,6 +93,7 @@ function ProductSuppliers({ productId, productName }) {
         .select('id, vendor_name, vendor_type')
         .eq('seller_id', userData.user.id)
         .eq('status', 'accepted')
+        .eq('vendor_type', 'supplier')
         .order('vendor_name')
 
       if (!error && data) {
@@ -187,7 +188,7 @@ function ProductSuppliers({ productId, productName }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-white">
-                <th className="text-left p-2">Vendor Name</th>
+                <th className="text-left p-2">Supplier Name</th>
                 <th className="text-left p-2">Lead Time (days)</th>
                 <th className="text-left p-2">Min Order Qty</th>
                 <th className="text-left p-2">Unit Price</th>
@@ -228,21 +229,27 @@ function ProductSuppliers({ productId, productName }) {
           <form onSubmit={handleAddSupplier} className="flex flex-col h-full">
             <div className="space-y-4 px-6 pt-4 pb-4 flex-1 overflow-y-auto">
               <div className="space-y-2">
-                <Label>Vendor *</Label>
+                <Label>Supplier *</Label>
                 <Select
                   value={newSupplier.vendor_id}
                   onValueChange={(value) => setNewSupplier({ ...newSupplier, vendor_id: value })}
                   required
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a vendor" />
+                    <SelectValue placeholder="Select a supplier" />
                   </SelectTrigger>
                   <SelectContent>
-                    {vendors.map((vendor) => (
-                      <SelectItem key={vendor.id} value={vendor.id}>
-                        {vendor.vendor_name} ({vendor.vendor_type.replace('_', ' ')})
+                    {vendors.length === 0 ? (
+                      <SelectItem value="no-suppliers" disabled>
+                        No suppliers available
                       </SelectItem>
-                    ))}
+                    ) : (
+                      vendors.map((vendor) => (
+                        <SelectItem key={vendor.id} value={vendor.id}>
+                          {vendor.vendor_name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
