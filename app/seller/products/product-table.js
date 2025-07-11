@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/select'
 
 // Component for the expanded row content
-function ProductSuppliers({ productId, productName }) {
+function ProductSuppliers({ productId, productName, onPriceUpdate }) {
   const [suppliers, setSuppliers] = useState([])
   const [loading, setLoading] = useState(true)
   const [isAddingSupplier, setIsAddingSupplier] = useState(false)
@@ -237,6 +237,10 @@ function ProductSuppliers({ productId, productName }) {
         price_tiers: [{ minimum_order_quantity: '', unit_price: '', is_default: true }],
       })
       fetchSuppliers()
+      // Refresh products if this was the first (primary) supplier
+      if (suppliers.length === 0 && onPriceUpdate) {
+        onPriceUpdate()
+      }
     } catch (error) {
       console.error('Error adding supplier:', error)
       toast.error('Failed to add supplier')
@@ -329,6 +333,21 @@ function ProductSuppliers({ productId, productName }) {
         }
       }
 
+      // If this is the primary supplier, update the product price with the default tier
+      if (editingSupplier.is_primary) {
+        const defaultTier = tierData.find(t => t.is_default)
+        if (defaultTier) {
+          const { error: priceError } = await supabase
+            .from('products')
+            .update({ price: defaultTier.unit_price })
+            .eq('id', productId)
+          
+          if (priceError) {
+            console.error('Error updating product price:', priceError)
+          }
+        }
+      }
+
       toast.success('Supplier updated successfully')
       setIsAddingSupplier(false)
       setEditingSupplier(null)
@@ -338,6 +357,10 @@ function ProductSuppliers({ productId, productName }) {
         price_tiers: [{ minimum_order_quantity: '', unit_price: '', is_default: true }],
       })
       fetchSuppliers()
+      // Also refresh products to show updated price
+      if (editingSupplier.is_primary && onPriceUpdate) {
+        onPriceUpdate()
+      }
     } catch (error) {
       console.error('Error updating supplier:', error)
       toast.error('Failed to update supplier')
@@ -375,6 +398,10 @@ function ProductSuppliers({ productId, productName }) {
       }
 
       fetchSuppliers()
+      // Refresh products to show updated price
+      if (onPriceUpdate) {
+        onPriceUpdate()
+      }
     } catch (error) {
       console.error('Error setting primary supplier:', error)
       toast.error('Failed to set primary supplier')
@@ -1181,6 +1208,7 @@ export function ProductTable() {
             <ProductSuppliers
               productId={row.original.id}
               productName={row.original.product_name}
+              onPriceUpdate={fetchProducts}
             />
           )}
           meta={{

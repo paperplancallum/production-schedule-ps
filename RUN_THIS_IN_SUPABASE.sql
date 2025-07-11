@@ -139,3 +139,37 @@ CREATE TRIGGER ensure_single_primary_supplier_trigger
   BEFORE INSERT OR UPDATE ON public.product_suppliers
   FOR EACH ROW
   EXECUTE FUNCTION ensure_single_primary_supplier();
+
+-- Create a function to update product price when default tier changes
+CREATE OR REPLACE FUNCTION update_product_price_on_tier_change()
+RETURNS TRIGGER AS $$
+DECLARE
+  supplier_record RECORD;
+  product_id_val UUID;
+BEGIN
+  -- Only proceed if this tier is being set as default
+  IF NEW.is_default = true THEN
+    -- Get the supplier and check if it's primary
+    SELECT ps.*, p.id as prod_id INTO supplier_record
+    FROM public.product_suppliers ps
+    JOIN public.products p ON ps.product_id = p.id
+    WHERE ps.id = NEW.product_supplier_id
+      AND ps.is_primary = true;
+    
+    -- If this is a primary supplier's tier, update the product price
+    IF FOUND THEN
+      UPDATE public.products
+      SET price = NEW.unit_price
+      WHERE id = supplier_record.prod_id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to update product price when tier default changes
+DROP TRIGGER IF EXISTS update_product_price_on_tier_change_trigger ON public.supplier_price_tiers;
+CREATE TRIGGER update_product_price_on_tier_change_trigger
+  AFTER INSERT OR UPDATE ON public.supplier_price_tiers
+  FOR EACH ROW
+  EXECUTE FUNCTION update_product_price_on_tier_change();
