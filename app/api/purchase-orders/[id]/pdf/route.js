@@ -79,118 +79,120 @@ export async function GET(request, { params }) {
     ]
 
     // Add items to table
-    ;(items || []).forEach(item => {
-      tableBody.push([
-        item.product.sku,
-        item.product.product_name,
-        { text: item.quantity.toString(), alignment: 'right' },
-        item.product.unit_of_measure || 'units',
-        { text: `$${item.unit_price.toFixed(2)}`, alignment: 'right' },
-        { text: `$${(item.quantity * item.unit_price).toFixed(2)}`, alignment: 'right' }
-      ])
-    })
+    if (items && items.length > 0) {
+      items.forEach(item => {
+        tableBody.push([
+          item.product.sku,
+          item.product.product_name,
+          { text: item.quantity.toString(), alignment: 'right' },
+          item.product.unit_of_measure || 'units',
+          { text: `$${item.unit_price.toFixed(2)}`, alignment: 'right' },
+          { text: `$${(item.quantity * item.unit_price).toFixed(2)}`, alignment: 'right' }
+        ])
+      })
+    }
 
     // Build content array
-    const content = [
-      // Header
+    const content = []
+    
+    // Header
+    content.push(
       { text: 'PURCHASE ORDER', style: 'header', alignment: 'center' },
       { text: `PO Number: ${order.po_number}`, alignment: 'center', margin: [0, 5] },
       { text: `Date: ${new Date(order.created_at).toLocaleDateString()}`, alignment: 'center' },
-      { text: `Status: ${order.status.replace(/_/g, ' ').toUpperCase()}`, alignment: 'center' },
-    ]
+      { text: `Status: ${order.status.replace(/_/g, ' ').toUpperCase()}`, alignment: 'center' }
+    )
     
     if (order.trade_terms) {
       content.push({ text: `Trade Terms: ${order.trade_terms}`, alignment: 'center' })
     }
     
-    content.push(
-      // Separator
-      { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 515, y2: 5, lineWidth: 2 }], margin: [0, 20] },
-      
-      // Buyer and Supplier info
-      {
-        columns: [
-          {
-            width: '50%',
-            stack: [
-              { text: 'FROM (BUYER)', style: 'subheader' },
-              { text: seller?.company_name || 'Company Name', bold: true, margin: [0, 5] },
-              ...(seller?.address ? [{ text: seller.address }] : []),
-              ...(seller?.email ? [{ text: `Email: ${seller.email}` }] : []),
-              ...(seller?.phone_number ? [{ text: `Phone: ${seller.phone_number}` }] : [])
-            ]
-          },
-          {
-            width: '50%',
-            stack: [
-              { text: 'TO (SUPPLIER)', style: 'subheader' },
-              { text: supplier?.vendor_name || 'Unknown Supplier', bold: true, margin: [0, 5] },
-              ...(supplier?.address ? [{ text: supplier.address }] : []),
-              ...(supplier?.email ? [{ text: `Email: ${supplier.email}` }] : []),
-              ...(supplier?.contact_name ? [{ text: `Contact: ${supplier.contact_name}` }] : []),
-              ...(supplier?.vendor_phone ? [{ text: `Phone: ${supplier.vendor_phone}` }] : [])
-            ]
-          }
-        ],
-        margin: [0, 0, 0, 30]
-      },
-      
-      // Items table
-      {
-        table: {
-          headerRows: 1,
-          widths: ['15%', '35%', '12%', '13%', '12%', '13%'],
-          body: tableBody
+    // Separator
+    content.push({ canvas: [{ type: 'line', x1: 0, y1: 5, x2: 515, y2: 5, lineWidth: 2 }], margin: [0, 20] })
+    
+    // Buyer and Supplier info
+    content.push({
+      columns: [
+        {
+          width: '50%',
+          stack: [
+            { text: 'FROM (BUYER)', style: 'subheader' },
+            { text: seller?.company_name || 'Company Name', bold: true, margin: [0, 5] },
+            ...(seller?.address ? [{ text: seller.address }] : []),
+            ...(seller?.email ? [{ text: `Email: ${seller.email}` }] : []),
+            ...(seller?.phone_number ? [{ text: `Phone: ${seller.phone_number}` }] : [])
+          ]
         },
-        layout: {
-          fillColor: function (rowIndex) {
-            return (rowIndex === 0) ? '#f0f0f0' : null
-          },
-          hLineWidth: function (i, node) {
-            return (i === 0 || i === 1 || i === node.table.body.length) ? 2 : 1
-          },
-          vLineWidth: function () {
-            return 0
-          },
-          hLineColor: function (i, node) {
-            return (i === 0 || i === 1 || i === node.table.body.length) ? '#333' : '#ddd'
-          },
-          paddingTop: function () {
-            return 8
-          },
-          paddingBottom: function () {
-            return 8
-          }
+        {
+          width: '50%',
+          stack: [
+            { text: 'TO (SUPPLIER)', style: 'subheader' },
+            { text: supplier?.vendor_name || 'Unknown Supplier', bold: true, margin: [0, 5] },
+            ...(supplier?.address ? [{ text: supplier.address }] : []),
+            ...(supplier?.email ? [{ text: `Email: ${supplier.email}` }] : []),
+            ...(supplier?.contact_name ? [{ text: `Contact: ${supplier.contact_name}` }] : []),
+            ...(supplier?.vendor_phone ? [{ text: `Phone: ${supplier.vendor_phone}` }] : [])
+          ]
         }
+      ],
+      margin: [0, 0, 0, 30]
+    })
+    
+    // Items table
+    content.push({
+      table: {
+        headerRows: 1,
+        widths: ['15%', '35%', '12%', '13%', '12%', '13%'],
+        body: tableBody
       },
-      
-      // Totals
-      {
-        columns: [
-          { width: '*', text: '' },
-          {
-            width: 200,
-            stack: [
-              { 
-                columns: [
-                  { text: 'Subtotal:', alignment: 'right' },
-                  { text: `$${(order.subtotal || 0).toFixed(2)}`, alignment: 'right', width: 80 }
-                ],
-                margin: [0, 20, 0, 5]
-              },
-              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 2 }] },
-              { 
-                columns: [
-                  { text: 'Total:', bold: true, fontSize: 14, alignment: 'right' },
-                  { text: `$${(order.total_amount || 0).toFixed(2)}`, bold: true, fontSize: 14, alignment: 'right', width: 80 }
-                ],
-                margin: [0, 10, 0, 0]
-              }
-            ]
-          }
-        ]
+      layout: {
+        fillColor: function (rowIndex) {
+          return (rowIndex === 0) ? '#f0f0f0' : null
+        },
+        hLineWidth: function (i, node) {
+          return (i === 0 || i === 1 || i === node.table.body.length) ? 2 : 1
+        },
+        vLineWidth: function () {
+          return 0
+        },
+        hLineColor: function (i, node) {
+          return (i === 0 || i === 1 || i === node.table.body.length) ? '#333' : '#ddd'
+        },
+        paddingTop: function () {
+          return 8
+        },
+        paddingBottom: function () {
+          return 8
+        }
       }
-    )
+    })
+    
+    // Totals
+    content.push({
+      columns: [
+        { width: '*', text: '' },
+        {
+          width: 200,
+          stack: [
+            { 
+              columns: [
+                { text: 'Subtotal:', alignment: 'right' },
+                { text: `$${(order.subtotal || 0).toFixed(2)}`, alignment: 'right', width: 80 }
+              ],
+              margin: [0, 20, 0, 5]
+            },
+            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 2 }] },
+            { 
+              columns: [
+                { text: 'Total:', bold: true, fontSize: 14, alignment: 'right' },
+                { text: `$${(order.total_amount || 0).toFixed(2)}`, bold: true, fontSize: 14, alignment: 'right', width: 80 }
+              ],
+              margin: [0, 10, 0, 0]
+            }
+          ]
+        }
+      ]
+    })
     
     // Add notes if present
     if (order.notes) {
