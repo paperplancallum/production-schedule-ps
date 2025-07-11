@@ -221,6 +221,8 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
         }
         throw supplierError
       }
+      
+      console.log('Supplier added successfully:', supplierResult)
 
       // Try to add price tiers - ensure only one is default
       const tierData = validTiers.map((tier, index) => ({

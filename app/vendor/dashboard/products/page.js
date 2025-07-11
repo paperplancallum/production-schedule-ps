@@ -23,6 +23,15 @@ export default async function VendorProductsPage() {
     redirect('/vendor/dashboard')
   }
 
+  // Debug: First check if there are any product_suppliers for this vendor
+  const { data: supplierCheck, error: checkError } = await supabase
+    .from('product_suppliers')
+    .select('*')
+    .eq('vendor_id', vendor.id)
+  
+  console.log('Product suppliers for vendor:', supplierCheck)
+  console.log('Vendor ID being used:', vendor.id)
+
   // Fetch products assigned to this vendor through product_suppliers
   let { data: products, error } = await supabase
     .from('products')
@@ -48,6 +57,8 @@ export default async function VendorProductsPage() {
   if (error) {
     console.error('Error fetching vendor products:', error)
   }
+  
+  console.log('Products found:', products?.length || 0)
 
   // Additional debug: Check if there are any product_suppliers entries for this vendor
   const { data: supplierEntries, error: supplierError } = await supabase
