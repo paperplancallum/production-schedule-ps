@@ -8,16 +8,19 @@ import Link from 'next/link'
 export default function SupplierProductsTable({ products, vendorId }) {
   const [searchTerm, setSearchTerm] = useState('')
 
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredProducts = products.filter(product => {
+    if (!product) return false
+    const name = product.product_name || ''
+    const sku = product.sku || ''
+    const search = searchTerm.toLowerCase()
+    return name.toLowerCase().includes(search) || sku.toLowerCase().includes(search)
+  })
 
   return (
     <div className="bg-white shadow rounded-lg">
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative max-w-sm">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-gray-400" />
             </div>
@@ -75,7 +78,7 @@ export default function SupplierProductsTable({ products, vendorId }) {
                         <div className="flex-shrink-0 h-10 w-10 mr-3">
                           <Image
                             src={product.image_url}
-                            alt={product.name}
+                            alt={product.product_name || 'Product'}
                             width={40}
                             height={40}
                             className="h-10 w-10 rounded object-cover"
@@ -84,7 +87,7 @@ export default function SupplierProductsTable({ products, vendorId }) {
                       )}
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {product.name}
+                          {product.product_name || 'Unnamed Product'}
                         </div>
                         {product.description && (
                           <div className="text-sm text-gray-500">
@@ -95,13 +98,13 @@ export default function SupplierProductsTable({ products, vendorId }) {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.sku}
+                    {product.sku || 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${supplierInfo.price_per_unit || product.price}
+                    ${supplierInfo.unit_price || supplierInfo.price_per_unit || product.price || 0}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {supplierInfo.moq || 1} units
+                    {supplierInfo.minimum_order_quantity || supplierInfo.moq || 1} units
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {supplierInfo.lead_time_days || 0} days
@@ -114,7 +117,7 @@ export default function SupplierProductsTable({ products, vendorId }) {
                         ? 'bg-gray-100 text-gray-800'
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {product.status}
+                      {product.status || 'Unknown'}
                     </span>
                   </td>
                 </tr>

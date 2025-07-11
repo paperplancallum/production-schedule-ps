@@ -31,7 +31,7 @@ export default async function AssignProductsPage({ params }) {
   const { data: assignedProducts, error: assignedError } = await supabase
     .from('product_suppliers')
     .select('product_id')
-    .eq('supplier_id', params.id)
+    .eq('vendor_id', params.id)
 
   const assignedProductIds = assignedProducts?.map(ap => ap.product_id) || []
 

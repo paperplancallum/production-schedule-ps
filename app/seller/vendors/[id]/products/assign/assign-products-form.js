@@ -60,7 +60,7 @@ export default function AssignProductsForm({ vendorId, vendorName, products, ass
       const { error: deleteError } = await supabase
         .from('product_suppliers')
         .delete()
-        .eq('supplier_id', vendorId)
+        .eq('vendor_id', vendorId)
 
       if (deleteError) throw deleteError
 
@@ -68,10 +68,11 @@ export default function AssignProductsForm({ vendorId, vendorName, products, ass
       if (selectedProducts.size > 0) {
         const assignments = Array.from(selectedProducts).map(productId => ({
           product_id: productId,
-          supplier_id: vendorId,
-          price_per_unit: supplierInfo[productId]?.price_per_unit || products.find(p => p.id === productId)?.price || 0,
-          moq: supplierInfo[productId]?.moq || 1,
-          lead_time_days: supplierInfo[productId]?.lead_time_days || 7
+          vendor_id: vendorId,
+          unit_price: supplierInfo[productId]?.price_per_unit || products.find(p => p.id === productId)?.price || 0,
+          minimum_order_quantity: supplierInfo[productId]?.moq || 1,
+          lead_time_days: supplierInfo[productId]?.lead_time_days || 7,
+          is_primary: false
         }))
 
         const { error: insertError } = await supabase

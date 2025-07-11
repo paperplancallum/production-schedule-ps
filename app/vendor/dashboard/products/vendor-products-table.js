@@ -9,10 +9,13 @@ import { Search } from 'lucide-react'
 export default function VendorProductsTable({ products }) {
   const [searchTerm, setSearchTerm] = useState('')
 
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredProducts = products.filter(product => {
+    if (!product) return false
+    const name = product.product_name || product.name || ''
+    const sku = product.sku || ''
+    const search = searchTerm.toLowerCase()
+    return name.toLowerCase().includes(search) || sku.toLowerCase().includes(search)
+  })
 
   return (
     <Card>
@@ -69,7 +72,7 @@ export default function VendorProductsTable({ products }) {
                         <div className="flex-shrink-0 h-10 w-10 mr-3">
                           <Image
                             src={product.image_url}
-                            alt={product.name}
+                            alt={product.product_name || product.name || 'Product'}
                             width={40}
                             height={40}
                             className="h-10 w-10 rounded object-cover"
@@ -78,7 +81,7 @@ export default function VendorProductsTable({ products }) {
                       )}
                       <div>
                         <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                          {product.name}
+                          {product.product_name || product.name || 'Unnamed Product'}
                         </div>
                         {product.description && (
                           <div className="text-sm text-slate-500 dark:text-slate-400">
@@ -92,10 +95,20 @@ export default function VendorProductsTable({ products }) {
                     {product.sku}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-slate-100">
-                    ${supplierInfo.price_per_unit || product.price}
+                    {(() => {
+                      const tiers = supplierInfo.supplier_price_tiers || []
+                      const defaultTier = tiers.find(t => t.is_default) || tiers[0]
+                      return defaultTier ? `$${defaultTier.unit_price}` : `$${product.price || 0}`
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-slate-100">
-                    {supplierInfo.moq || 1} units
+                    {(() => {
+                      const tiers = supplierInfo.supplier_price_tiers || []
+                      const minTier = tiers.reduce((min, tier) => 
+                        !min || tier.minimum_order_quantity < min.minimum_order_quantity ? tier : min, null
+                      )
+                      return minTier ? `${minTier.minimum_order_quantity} units` : '1 unit'
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-slate-100">
                     {supplierInfo.lead_time_days || 0} days

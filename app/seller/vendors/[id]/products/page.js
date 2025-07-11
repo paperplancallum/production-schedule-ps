@@ -40,6 +40,17 @@ export default async function SupplierProductsPage({ params }) {
     console.error('Error fetching supplier products:', productsError)
   }
 
+  // Debug logging
+  console.log('[SELLER VIEW] Vendor ID:', params.id)
+  console.log('[SELLER VIEW] Products found:', products?.length || 0)
+  if (products && products.length > 0) {
+    console.log('[SELLER VIEW] Sample product with supplier info:', {
+      id: products[0].id,
+      name: products[0].product_name,
+      supplier_info: products[0].product_suppliers
+    })
+  }
+
   return (
     <div>
       <div className="mb-6">

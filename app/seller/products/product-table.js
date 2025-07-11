@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { DataTable } from '@/components/ui/data-table'
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,7 +24,7 @@ import {
 } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2, ChevronDown, ChevronRight, Star } from 'lucide-react'
+import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2, ChevronDown, ChevronRight, Star, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Select,
@@ -42,6 +43,7 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
   const [newSupplier, setNewSupplier] = useState({
     vendor_id: '',
     lead_time_days: '',
+    moq: '',
     price_tiers: [{ minimum_order_quantity: '', unit_price: '', is_default: true }],
   })
   const [vendors, setVendors] = useState([])
@@ -171,6 +173,21 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
         return
       }
 
+      // Validate MOQ matches first price tier
+      const moq = parseInt(newSupplier.moq)
+      if (moq && validTiers.length > 0) {
+        // Sort tiers by MOQ to find the first (lowest) tier
+        const sortedTiers = [...validTiers].sort((a, b) => 
+          parseInt(a.minimum_order_quantity) - parseInt(b.minimum_order_quantity)
+        )
+        const firstTierMoq = parseInt(sortedTiers[0].minimum_order_quantity)
+        
+        if (firstTierMoq !== moq) {
+          toast.error(`The first price tier (${firstTierMoq} units) must match the MOQ (${moq} units)`)
+          return
+        }
+      }
+
       // Create supplier first
       const supplierData = {
         product_id: productId,
@@ -182,7 +199,14 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
         // If no suppliers exist, make this one primary
         is_primary: suppliers.length === 0,
       }
+      
+      // Only add moq if it's a valid number
+      const moqValue = parseInt(newSupplier.moq)
+      if (!isNaN(moqValue) && moqValue > 0) {
+        supplierData.moq = moqValue
+      }
 
+      console.log('Adding supplier with data:', supplierData)
       const { data: supplierResult, error: supplierError } = await supabase
         .from('product_suppliers')
         .insert([supplierData])
@@ -190,6 +214,7 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
         .single()
 
       if (supplierError) {
+        console.error('Supabase error:', supplierError)
         if (supplierError.code === '23505') {
           toast.error('This vendor is already a supplier for this product')
           return
@@ -234,6 +259,7 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
       setNewSupplier({
         vendor_id: '',
         lead_time_days: '',
+        moq: '',
         price_tiers: [{ minimum_order_quantity: '', unit_price: '', is_default: true }],
       })
       fetchSuppliers()
@@ -243,7 +269,8 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
       }
     } catch (error) {
       console.error('Error adding supplier:', error)
-      toast.error('Failed to add supplier')
+      const errorMessage = error?.message || error?.error || 'Failed to add supplier'
+      toast.error(errorMessage)
     }
   }
 
@@ -252,6 +279,7 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
     setNewSupplier({
       vendor_id: supplier.vendor_id,
       lead_time_days: supplier.lead_time_days.toString(),
+      moq: supplier.moq ? supplier.moq.toString() : '',
       price_tiers: supplier.supplier_price_tiers && supplier.supplier_price_tiers.length > 0
         ? supplier.supplier_price_tiers.map(tier => ({
             id: tier.id,
@@ -278,6 +306,21 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
         return
       }
 
+      // Validate MOQ matches first price tier
+      const moq = parseInt(newSupplier.moq)
+      if (moq && validTiers.length > 0) {
+        // Sort tiers by MOQ to find the first (lowest) tier
+        const sortedTiers = [...validTiers].sort((a, b) => 
+          parseInt(a.minimum_order_quantity) - parseInt(b.minimum_order_quantity)
+        )
+        const firstTierMoq = parseInt(sortedTiers[0].minimum_order_quantity)
+        
+        if (firstTierMoq !== moq) {
+          toast.error(`The first price tier (${firstTierMoq} units) must match the MOQ (${moq} units)`)
+          return
+        }
+      }
+
       // Update supplier
       const supplierData = {
         lead_time_days: parseInt(newSupplier.lead_time_days),
@@ -285,13 +328,23 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
         minimum_order_quantity: parseInt(validTiers[0].minimum_order_quantity),
         unit_price: parseFloat(validTiers[0].unit_price),
       }
+      
+      // Only add moq if it's a valid number
+      const moqValue = parseInt(newSupplier.moq)
+      if (!isNaN(moqValue) && moqValue > 0) {
+        supplierData.moq = moqValue
+      }
 
+      console.log('Updating supplier with data:', supplierData)
       const { error: supplierError } = await supabase
         .from('product_suppliers')
         .update(supplierData)
         .eq('id', editingSupplier.id)
 
-      if (supplierError) throw supplierError
+      if (supplierError) {
+        console.error('Supabase error:', supplierError)
+        throw supplierError
+      }
 
       // Handle price tiers
       // First, check if price tiers table exists
@@ -354,6 +407,7 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
       setNewSupplier({
         vendor_id: '',
         lead_time_days: '',
+        moq: '',
         price_tiers: [{ minimum_order_quantity: '', unit_price: '', is_default: true }],
       })
       fetchSuppliers()
@@ -363,7 +417,8 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
       }
     } catch (error) {
       console.error('Error updating supplier:', error)
-      toast.error('Failed to update supplier')
+      const errorMessage = error?.message || error?.error || 'Failed to update supplier'
+      toast.error(errorMessage)
     }
   }
 
@@ -433,7 +488,15 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
         <h4 className="text-sm font-medium text-slate-900">Suppliers for {productName}</h4>
         <Button
           size="sm"
-          onClick={() => setIsAddingSupplier(true)}
+          onClick={() => {
+            setNewSupplier({
+              vendor_id: '',
+              lead_time_days: '',
+              moq: '',
+              price_tiers: [{ minimum_order_quantity: '', unit_price: '', is_default: true }],
+            })
+            setIsAddingSupplier(true)
+          }}
         >
           <Plus className="mr-2 h-3 w-3" />
           Add Supplier
@@ -534,7 +597,7 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
                   </tr>
                   {expandedSuppliers[supplier.id] && (
                     <tr>
-                      <td colSpan={5} className="p-0">
+                      <td colSpan={6} className="p-0">
                         <div className="bg-slate-50 p-4">
                           <h5 className="text-sm font-medium text-slate-700 mb-2">Price Tiers</h5>
                           {supplier.supplier_price_tiers?.length > 0 ? (
@@ -570,6 +633,7 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
           setNewSupplier({
             vendor_id: '',
             lead_time_days: '',
+            moq: '',
             price_tiers: [{ minimum_order_quantity: '', unit_price: '' }],
           })
         }
@@ -627,6 +691,32 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="moq">Minimum Order Quantity (MOQ) *</Label>
+                <Input
+                  id="moq"
+                  type="number"
+                  value={newSupplier.moq || ''}
+                  onChange={(e) => {
+                    const moqValue = e.target.value
+                    // Update MOQ and automatically update the first price tier's MOQ
+                    const updatedTiers = [...newSupplier.price_tiers]
+                    if (updatedTiers.length > 0) {
+                      // Find the tier with the lowest MOQ (should be first tier)
+                      const lowestIndex = updatedTiers.reduce((minIdx, tier, idx, arr) => {
+                        const currentMoq = parseInt(tier.minimum_order_quantity) || Infinity
+                        const minMoq = parseInt(arr[minIdx].minimum_order_quantity) || Infinity
+                        return currentMoq < minMoq ? idx : minIdx
+                      }, 0)
+                      updatedTiers[lowestIndex].minimum_order_quantity = moqValue
+                    }
+                    setNewSupplier({ ...newSupplier, moq: moqValue, price_tiers: updatedTiers })
+                  }}
+                  required
+                  min="1"
+                />
+                <p className="text-xs text-slate-500">The first price tier will automatically match this MOQ</p>
+              </div>
+              <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label>Price Tiers *</Label>
                   <Button
@@ -674,6 +764,15 @@ function ProductSuppliers({ productId, productName, onPriceUpdate }) {
                             setNewSupplier({ ...newSupplier, price_tiers: newTiers })
                           }}
                           required
+                          disabled={(() => {
+                            // Disable if this is the lowest tier and it matches the MOQ
+                            const sortedTiers = [...newSupplier.price_tiers]
+                              .filter(t => t.minimum_order_quantity)
+                              .sort((a, b) => parseInt(a.minimum_order_quantity) - parseInt(b.minimum_order_quantity))
+                            const isLowestTier = sortedTiers.length > 0 && 
+                              parseInt(tier.minimum_order_quantity) === parseInt(sortedTiers[0].minimum_order_quantity)
+                            return isLowestTier && parseInt(tier.minimum_order_quantity) === parseInt(newSupplier.moq)
+                          })()}
                         />
                       </div>
                       <div className="flex-1">
@@ -747,6 +846,28 @@ const columns = [
     },
   },
   {
+    id: 'select',
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Select all"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Select row"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
+  {
     accessorKey: 'product_name',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Product Name" />
@@ -793,6 +914,20 @@ const columns = [
     },
   },
   {
+    accessorKey: 'supplier_moq',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="MOQ" />
+    ),
+    cell: ({ row }) => {
+      const moq = row.getValue('supplier_moq')
+      return (
+        <div className="text-slate-600">
+          {moq || '-'}
+        </div>
+      )
+    },
+  },
+  {
     accessorKey: 'created_at',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Created" />
@@ -823,6 +958,14 @@ const columns = [
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem
+              onClick={() => table.options.meta?.onCreatePO([product.id])}
+              className="cursor-pointer"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Create PO
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
               onClick={() => table.options.meta?.onEditProduct(product)}
               className="cursor-pointer"
             >
@@ -849,6 +992,7 @@ export function ProductTable() {
   const [loading, setLoading] = useState(true)
   const [isAddingProduct, setIsAddingProduct] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
+  const [selectedRows, setSelectedRows] = useState({})
   const [formData, setFormData] = useState({
     product_name: '',
     sku: '',
@@ -891,6 +1035,8 @@ export function ProductTable() {
           *,
           product_suppliers!left (
             is_primary,
+            vendor_id,
+            moq,
             vendors (
               vendor_name
             )
@@ -909,11 +1055,16 @@ export function ProductTable() {
         throw error
       }
 
-      // Process data to include primary supplier name
-      const processedData = (data || []).map(product => ({
-        ...product,
-        primary_supplier_name: product.product_suppliers?.find(s => s.is_primary)?.vendors?.vendor_name || null
-      }))
+      // Process data to include primary supplier name and MOQ
+      const processedData = (data || []).map(product => {
+        const primarySupplier = product.product_suppliers?.find(s => s.is_primary)
+        return {
+          ...product,
+          primary_supplier_name: primarySupplier?.vendors?.vendor_name || null,
+          // Get MOQ from primary supplier only
+          supplier_moq: primarySupplier?.moq || null
+        }
+      })
 
       setProducts(processedData)
     } catch (error) {
@@ -1065,6 +1216,38 @@ export function ProductTable() {
     setEditingProduct(product)
   }
 
+  const handleCreatePO = (productIds) => {
+    if (!productIds || productIds.length === 0) {
+      toast.error('Please select at least one product')
+      return
+    }
+    
+    // Get the selected products
+    const selectedProducts = products.filter(product => productIds.includes(product.id))
+    
+    // Check if all products have a primary supplier
+    const productsWithoutSupplier = selectedProducts.filter(product => !product.primary_supplier_name)
+    if (productsWithoutSupplier.length > 0) {
+      toast.error('Some selected products do not have a primary supplier. Please set a primary supplier first.')
+      return
+    }
+    
+    // Get the primary supplier names
+    const suppliers = [...new Set(selectedProducts.map(product => product.primary_supplier_name))]
+    
+    // Check if all products have the same primary supplier
+    if (suppliers.length > 1) {
+      toast.error('Selected products have different suppliers. You can only create a PO for products from the same supplier.')
+      return
+    }
+    
+    // Show info message
+    toast.info('Please go to the Purchase Orders page to create a new PO')
+    
+    // Clear selection after showing message
+    setSelectedRows({})
+  }
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
@@ -1129,6 +1312,31 @@ export function ProductTable() {
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
+        </div>
+        <div className="flex gap-2">
+          {Object.keys(selectedRows).length > 0 && (() => {
+            const selectedIds = Object.keys(selectedRows).filter(id => selectedRows[id])
+            const selectedProducts = products.filter(product => selectedIds.includes(product.id))
+            const suppliers = [...new Set(selectedProducts.map(product => product.primary_supplier_name).filter(Boolean))]
+            const hasMultipleSuppliers = suppliers.length > 1
+            const hasNoSupplier = selectedProducts.some(product => !product.primary_supplier_name)
+            
+            return (
+              <Button
+                onClick={() => handleCreatePO(selectedIds)}
+                variant={hasMultipleSuppliers || hasNoSupplier ? "outline" : "default"}
+                disabled={hasNoSupplier}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                {hasNoSupplier 
+                  ? `Set Primary Supplier First (${selectedIds.length})`
+                  : hasMultipleSuppliers 
+                    ? `Multiple Suppliers (${selectedIds.length})`
+                    : `Create PO - ${suppliers[0]} (${selectedIds.length})`
+                }
+              </Button>
+            )
+          })()}
         </div>
       </div>
 
@@ -1207,9 +1415,12 @@ export function ProductTable() {
               onPriceUpdate={fetchProducts}
             />
           )}
+          rowSelection={selectedRows}
+          onRowSelectionChange={setSelectedRows}
           meta={{
             onEditProduct: openEditSheet,
             onDeleteProduct: handleDeleteProduct,
+            onCreatePO: handleCreatePO,
           }}
         />
       )}

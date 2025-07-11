@@ -27,11 +27,13 @@ export function DataTable({
   searchKey,
   renderSubComponent,
   meta,
+  rowSelection,
+  onRowSelectionChange,
 }) {
   const [sorting, setSorting] = React.useState([])
   const [columnFilters, setColumnFilters] = React.useState([])
   const [columnVisibility, setColumnVisibility] = React.useState({})
-  const [rowSelection, setRowSelection] = React.useState({})
+  const [internalRowSelection, setInternalRowSelection] = React.useState(rowSelection || {})
   const [expanded, setExpanded] = React.useState({})
 
   const table = useReactTable({
@@ -45,13 +47,13 @@ export function DataTable({
     getFilteredRowModel: getFilteredRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: onRowSelectionChange || setInternalRowSelection,
     onExpandedChange: setExpanded,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
-      rowSelection,
+      rowSelection: rowSelection !== undefined ? rowSelection : internalRowSelection,
       expanded,
     },
     meta,

@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS product_suppliers (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  supplier_id UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+  vendor_id UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   price_per_unit DECIMAL(10, 2),
   moq INTEGER DEFAULT 1, -- Minimum Order Quantity
   lead_time_days INTEGER DEFAULT 0,
@@ -12,12 +12,12 @@ CREATE TABLE IF NOT EXISTS product_suppliers (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   
   -- Ensure unique product-supplier combination
-  UNIQUE(product_id, supplier_id)
+  UNIQUE(product_id, vendor_id)
 );
 
 -- Create indexes for better query performance
 CREATE INDEX idx_product_suppliers_product_id ON product_suppliers(product_id);
-CREATE INDEX idx_product_suppliers_supplier_id ON product_suppliers(supplier_id);
+CREATE INDEX idx_product_suppliers_vendor_id ON product_suppliers(vendor_id);
 
 -- Enable RLS
 ALTER TABLE product_suppliers ENABLE ROW LEVEL SECURITY;
@@ -70,7 +70,7 @@ CREATE POLICY "Vendors can view their product relationships" ON product_supplier
   USING (
     EXISTS (
       SELECT 1 FROM vendors v
-      WHERE v.id = product_suppliers.supplier_id
+      WHERE v.id = product_suppliers.vendor_id
       AND v.user_id = auth.uid()
     )
   );

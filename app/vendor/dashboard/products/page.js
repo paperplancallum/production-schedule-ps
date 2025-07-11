@@ -29,14 +29,20 @@ export default async function VendorProductsPage() {
     .select(`
       *,
       product_suppliers!inner (
-        supplier_id,
-        price_per_unit,
-        moq,
-        lead_time_days
+        id,
+        vendor_id,
+        is_primary,
+        lead_time_days,
+        supplier_price_tiers (
+          id,
+          minimum_order_quantity,
+          unit_price,
+          is_default
+        )
       )
     `)
     .eq('seller_id', vendor.seller_id)
-    .eq('product_suppliers.supplier_id', vendor.id)
+    .eq('product_suppliers.vendor_id', vendor.id)
     .order('created_at', { ascending: false })
 
   // If product_suppliers table doesn't exist, fetch products without join
@@ -52,8 +58,38 @@ export default async function VendorProductsPage() {
     error = result.error
   }
 
+  // Additional debug: Check if there are any product_suppliers entries for this vendor
+  const { data: supplierEntries, error: supplierError } = await supabase
+    .from('product_suppliers')
+    .select('*')
+    .eq('vendor_id', vendor.id)
+    .limit(5)
+  
+  console.log('Product supplier entries for vendor:', supplierEntries)
+  console.log('Product supplier query error:', supplierError)
+  
+  // Also check without any filters to see if we can access the table at all
+  const { data: allSuppliers, error: allError } = await supabase
+    .from('product_suppliers')
+    .select('vendor_id')
+    .limit(10)
+  
+  console.log('All product suppliers (first 10):', allSuppliers)
+  console.log('All suppliers query error:', allError)
+
   if (error) {
     console.error('Error fetching products:', error)
+  }
+
+  // Debug logging
+  console.log('Current user ID:', user.id)
+  console.log('Vendor record:', vendor)
+  console.log('Vendor ID:', vendor?.id)
+  console.log('Seller ID:', vendor?.seller_id)
+  console.log('Products query error:', error)
+  console.log('Products found:', products?.length || 0)
+  if (products && products.length > 0) {
+    console.log('Sample product:', products[0])
   }
 
   return (
@@ -83,6 +119,18 @@ export default async function VendorProductsPage() {
             <p className="text-sm text-yellow-800 dark:text-yellow-200">
               The product suppliers relationship table is not set up yet. 
               Showing all products for now.
+            </p>
+          </div>
+        )}
+        
+        {/* Debug info */}
+        {products?.length === 0 && (
+          <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              No products have been assigned to your vendor account yet.
+            </p>
+            <p className="text-sm text-blue-800 dark:text-blue-200 mt-2">
+              Your seller needs to assign products to you through their vendor management panel.
             </p>
           </div>
         )}
