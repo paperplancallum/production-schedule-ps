@@ -20,11 +20,10 @@ export async function GET(request, { params }) {
         supplier:vendors!supplier_id(
           id,
           vendor_code,
-          business_address,
-          phone_number,
-          profile:profiles!vendors_id_fkey(
-            company_name
-          )
+          vendor_name,
+          email,
+          address,
+          contact_name
         ),
         items:purchase_order_items(
           id,
@@ -128,9 +127,8 @@ export async function PATCH(request, { params }) {
         supplier:vendors!supplier_id(
           id,
           vendor_code,
-          profile:profiles!vendors_id_fkey(
-            company_name
-          )
+          vendor_name,
+          email
         )
       `)
       .single()

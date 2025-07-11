@@ -171,6 +171,20 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
     }
   }
 
+  const handleCancelOrder = async () => {
+    // First confirmation
+    if (!confirm('Are you sure you want to cancel this purchase order?')) {
+      return
+    }
+    
+    // Second confirmation
+    if (!confirm('This action cannot be undone. Are you absolutely sure?')) {
+      return
+    }
+    
+    await handleStatusUpdate('cancelled')
+  }
+
   return (
     <div className="p-6">
       {/* Header */}
@@ -448,7 +462,7 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
               <CardContent>
                 <Button
                   variant="destructive"
-                  onClick={() => handleStatusUpdate('cancelled')}
+                  onClick={handleCancelOrder}
                   disabled={loading}
                   className="w-full"
                 >
