@@ -108,6 +108,7 @@ All tables use RLS policies to ensure:
 - Added edit functionality for suppliers (lead time & price tiers)
 - Added default tier selection with star icon
 - Added primary supplier feature (cascades default price to product)
+- Changed Price Tiers column to show price range ($min - $max)
 
 ### 2025-01-10
 - Initial products implementation

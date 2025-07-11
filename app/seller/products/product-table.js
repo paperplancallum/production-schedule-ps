@@ -429,7 +429,7 @@ function ProductSuppliers({ productId, productName }) {
                 <th className="text-left p-2 font-medium text-slate-700"></th>
                 <th className="text-left p-2 font-medium text-slate-700">Supplier Name</th>
                 <th className="text-left p-2 font-medium text-slate-700">Lead Time (days)</th>
-                <th className="text-left p-2 font-medium text-slate-700">Price Tiers</th>
+                <th className="text-left p-2 font-medium text-slate-700">Price Range</th>
                 <th className="text-left p-2 font-medium text-slate-700">Actions</th>
               </tr>
             </thead>
@@ -472,7 +472,17 @@ function ProductSuppliers({ productId, productName }) {
                     </td>
                     <td className="p-2 text-slate-600">{supplier.lead_time_days} days</td>
                     <td className="p-2 text-slate-600">
-                      {supplier.supplier_price_tiers?.length || 0} tier(s)
+                      {(() => {
+                        const tiers = supplier.supplier_price_tiers || []
+                        if (tiers.length === 0) return '-'
+                        if (tiers.length === 1) return `$${parseFloat(tiers[0].unit_price).toFixed(2)}`
+                        
+                        const prices = tiers.map(t => parseFloat(t.unit_price))
+                        const minPrice = Math.min(...prices)
+                        const maxPrice = Math.max(...prices)
+                        
+                        return `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`
+                      })()}
                     </td>
                     <td className="p-2">
                       <div className="flex gap-1">
