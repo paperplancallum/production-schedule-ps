@@ -76,8 +76,7 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
           prefilledItems.push({
             product_supplier_id: productSupplier.id,
             product_id: product.id,
-            product_name: product.product_name,
-            sku: product.sku,
+            product: productSupplier.product || product, // Include the full product object
             quantity: productSupplier.moq || 1,
             unit_price: defaultTier?.unit_price || 0,
             price_tier_id: defaultTier?.id || null,
