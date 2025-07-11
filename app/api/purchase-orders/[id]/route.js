@@ -213,8 +213,7 @@ export async function PUT(request, { params }) {
         product_supplier_id: item.product_supplier_id,
         price_tier_id: item.price_tier_id,
         quantity: item.quantity,
-        unit_price: item.unit_price,
-        line_total: item.line_total
+        unit_price: item.unit_price
       }))
 
       const { error: insertError } = await supabase

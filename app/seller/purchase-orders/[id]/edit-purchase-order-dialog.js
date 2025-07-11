@@ -225,8 +225,7 @@ export default function EditPurchaseOrderDialog({
             product_supplier_id: item.product_supplier_id,
             price_tier_id: item.price_tier_id,
             quantity: parseInt(item.quantity),
-            unit_price: parseFloat(item.unit_price),
-            line_total: item.quantity * item.unit_price
+            unit_price: parseFloat(item.unit_price)
           }))
         })
       })
