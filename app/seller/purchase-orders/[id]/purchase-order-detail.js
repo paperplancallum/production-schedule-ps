@@ -41,7 +41,7 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
     draft: { label: 'Draft', color: 'secondary', icon: FileText },
     sent_to_supplier: { label: 'Sent To Supplier', color: 'blue', icon: Mail },
     approved: { label: 'Approved', color: 'green', icon: CheckCircle },
-    in_progress: { label: 'In Progress', color: 'yellow', icon: Package },
+    in_progress: { label: 'In Production', color: 'yellow', icon: Package },
     complete: { label: 'Complete', color: 'green', icon: CheckCircle },
     cancelled: { label: 'Cancelled', color: 'destructive', icon: XCircle }
   }

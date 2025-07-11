@@ -13,7 +13,7 @@ const statusConfig = {
   draft: { label: 'Draft', color: 'secondary' },
   sent_to_supplier: { label: 'Sent To Supplier', color: 'blue' },
   approved: { label: 'Approved', color: 'green' },
-  in_progress: { label: 'In Progress', color: 'yellow' },
+  in_progress: { label: 'In Production', color: 'yellow' },
   complete: { label: 'Complete', color: 'green' },
   cancelled: { label: 'Cancelled', color: 'destructive' }
 }
