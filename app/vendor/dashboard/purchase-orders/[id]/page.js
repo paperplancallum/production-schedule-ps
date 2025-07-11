@@ -44,8 +44,8 @@ export default async function VendorPurchaseOrderPage({ params }) {
     .eq('id', order.seller_id)
     .single()
 
-  // Fetch order items first
-  const { data: items } = await supabase
+  // Fetch order items with product details through relation
+  const { data: itemsWithProducts } = await supabase
     .from('purchase_order_items')
     .select(`
       id,
@@ -55,27 +55,23 @@ export default async function VendorPurchaseOrderPage({ params }) {
       notes,
       product_id,
       product_supplier_id,
-      price_tier_id
+      price_tier_id,
+      products!product_id (
+        id,
+        product_name,
+        sku,
+        description,
+        unit_of_measure
+      )
     `)
     .eq('purchase_order_id', order.id)
-
-  // Fetch product details manually since vendors might not have direct access to products table
-  const itemsWithDetails = await Promise.all(
-    (items || []).map(async (item) => {
-      // Try to get product through the seller's products
-      const { data: product } = await supabase
-        .from('products')
-        .select('id, product_name, sku, description, unit_of_measure')
-        .eq('id', item.product_id)
-        .eq('seller_id', order.seller_id)
-        .single()
-
-      return {
-        ...item,
-        product: product || null
-      }
-    })
-  )
+  
+  // Map the data to match expected structure
+  const itemsWithDetails = (itemsWithProducts || []).map(item => ({
+    ...item,
+    product: item.products || item.product || null,
+    products: undefined // Remove the nested products field
+  }))
 
   // Fetch status history
   const { data: statusHistory } = await supabase
