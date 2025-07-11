@@ -91,7 +91,7 @@ export async function PATCH(request, { params }) {
     // Check if user has permission to update this order
     const { data: existingOrder, error: fetchError } = await supabase
       .from('purchase_orders')
-      .select('id, seller_id, supplier_id, status')
+      .select('id, seller_id, supplier_id, status, goods_ready_date')
       .eq('id', id)
       .single()
 
@@ -189,6 +189,27 @@ export async function PATCH(request, { params }) {
 
       if (historyError) {
         console.error('Error creating status history:', historyError)
+        // Don't fail the request if history creation fails
+      }
+    }
+
+    // If goods_ready_date was updated, create a status history record
+    if (body.goods_ready_date && body.goods_ready_date !== existingOrder.goods_ready_date) {
+      const oldDate = existingOrder.goods_ready_date ? new Date(existingOrder.goods_ready_date).toLocaleDateString() : 'not set'
+      const newDate = new Date(body.goods_ready_date).toLocaleDateString()
+      
+      const { error: historyError } = await supabase
+        .from('purchase_order_status_history')
+        .insert({
+          purchase_order_id: id,
+          from_status: existingOrder.status,
+          to_status: existingOrder.status, // Status doesn't change
+          changed_by: user.id,
+          notes: `Goods ready date updated from ${oldDate} to ${newDate}`
+        })
+
+      if (historyError) {
+        console.error('Error creating goods ready date history:', historyError)
         // Don't fail the request if history creation fails
       }
     }

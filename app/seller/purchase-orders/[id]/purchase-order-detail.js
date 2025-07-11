@@ -424,34 +424,47 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {order.status_history.map((history, index) => (
-                    <div key={history.id} className="border-l-2 border-gray-200 pl-4 pb-4 last:border-0">
-                      <div className="relative">
-                        <div className="absolute -left-6 top-0 w-3 h-3 bg-white border-2 border-gray-400 rounded-full"></div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant={statusConfig[history.to_status]?.color} className="text-xs">
-                            {statusConfig[history.to_status]?.label}
-                          </Badge>
-                          {history.from_status && (
-                            <span className="text-xs text-gray-500">
-                              from {statusConfig[history.from_status]?.label || history.from_status.replace(/_/g, ' ')}
-                            </span>
+                  {order.status_history.map((history, index) => {
+                    const isDateChange = history.notes?.includes('Goods ready date')
+                    
+                    return (
+                      <div key={history.id} className="border-l-2 border-gray-200 pl-4 pb-4 last:border-0">
+                        <div className="relative">
+                          <div className="absolute -left-6 top-0 w-3 h-3 bg-white border-2 border-gray-400 rounded-full"></div>
+                          <div className="flex items-center gap-2 mb-1">
+                            {isDateChange ? (
+                              <Badge variant="secondary" className="text-xs">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                Date Updated
+                              </Badge>
+                            ) : (
+                              <>
+                                <Badge variant={statusConfig[history.to_status]?.color} className="text-xs">
+                                  {statusConfig[history.to_status]?.label}
+                                </Badge>
+                                {history.from_status && history.from_status !== history.to_status && (
+                                  <span className="text-xs text-gray-500">
+                                    from {statusConfig[history.from_status]?.label || history.from_status.replace(/_/g, ' ')}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {formatDateTime(history.created_at)}
+                            {history.changed_by_user && (
+                              <span className="ml-2">
+                                by {history.changed_by_user.name}
+                              </span>
+                            )}
+                          </p>
+                          {history.notes && (
+                            <p className="text-sm text-gray-600 mt-1">{history.notes}</p>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500">
-                          {formatDateTime(history.created_at)}
-                          {history.changed_by_user && (
-                            <span className="ml-2">
-                              by {history.changed_by_user.name}
-                            </span>
-                          )}
-                        </p>
-                        {history.notes && (
-                          <p className="text-sm text-gray-600 mt-1">{history.notes}</p>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>

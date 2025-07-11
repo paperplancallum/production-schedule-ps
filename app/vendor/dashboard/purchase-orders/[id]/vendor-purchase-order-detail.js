@@ -81,12 +81,19 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
       // Convert vendor status to seller status for database
       const sellerStatus = getSellerStatus(newVendorStatus)
       
+      const updateData = { status: sellerStatus }
+      
+      // If approving, also set the goods ready date
+      if (newVendorStatus === 'approved' && vendorStatus === 'to_approve') {
+        updateData.goods_ready_date = goodsReadyDate
+      }
+      
       const response = await fetch(`/api/purchase-orders/${order.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: sellerStatus })
+        body: JSON.stringify(updateData)
       })
 
       if (response.ok) {
@@ -94,6 +101,7 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
         setOrder({
           ...order,
           status: updatedOrder.status,
+          goods_ready_date: updatedOrder.goods_ready_date,
           updated_at: updatedOrder.updated_at
         })
       } else {
@@ -398,15 +406,23 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
                   {order.status_history.map((history, index) => {
                     const fromVendorStatus = history.from_status ? getVendorStatus(history.from_status) : null
                     const toVendorStatus = getVendorStatus(history.to_status)
+                    const isDateChange = history.notes?.includes('Goods ready date')
                     
                     return (
                       <div key={history.id} className="border-l-2 border-gray-200 pl-4 pb-4 last:border-0">
                         <div className="relative">
                           <div className="absolute -left-6 top-0 w-3 h-3 bg-white border-2 border-gray-400 rounded-full"></div>
                           <div className="flex items-center gap-2 mb-1">
-                            <Badge variant={vendorStatusConfig[toVendorStatus]?.color} className="text-xs">
-                              {vendorStatusConfig[toVendorStatus]?.label}
-                            </Badge>
+                            {isDateChange ? (
+                              <Badge variant="secondary" className="text-xs">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                Date Updated
+                              </Badge>
+                            ) : (
+                              <Badge variant={vendorStatusConfig[toVendorStatus]?.color} className="text-xs">
+                                {vendorStatusConfig[toVendorStatus]?.label}
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-xs text-gray-500">
                             {formatDateTime(history.created_at)}

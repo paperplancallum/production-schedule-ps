@@ -113,9 +113,7 @@ export default function SettingsPage() {
             .from('sellers')
             .insert({
               id: user.id,
-              full_name: userInfo.full_name,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              full_name: userInfo.full_name
             })
           
           if (insertError) {
@@ -127,14 +125,18 @@ export default function SettingsPage() {
           const { data, error } = await supabase
             .from('sellers')
             .update({
-              full_name: userInfo.full_name,
-              updated_at: new Date().toISOString()
+              full_name: userInfo.full_name
             })
             .eq('id', user.id)
             .select()
           
           if (error) {
-            console.error('Update error:', error)
+            console.error('Update error details:', {
+              message: error.message,
+              details: error.details,
+              hint: error.hint,
+              code: error.code
+            })
             throw error
           }
           
@@ -172,9 +174,7 @@ export default function SettingsPage() {
             .from('sellers')
             .insert({
               id: user.id,
-              ...businessInfo,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              ...businessInfo
             })
           
           if (insertError) {
@@ -186,8 +186,7 @@ export default function SettingsPage() {
           const { data, error } = await supabase
             .from('sellers')
             .update({
-              ...businessInfo,
-              updated_at: new Date().toISOString()
+              ...businessInfo
             })
             .eq('id', user.id)
             .select()
