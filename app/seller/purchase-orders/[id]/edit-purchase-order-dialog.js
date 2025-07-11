@@ -428,7 +428,7 @@ export default function EditPurchaseOrderDialog({
 
               {formData.items.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  No items added yet. Click "Add Item" to add products to this order.
+                  No items added yet. Click &quot;Add Item&quot; to add products to this order.
                 </div>
               )}
             </div>

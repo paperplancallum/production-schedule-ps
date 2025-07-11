@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CheckCircle2, XCircle, Copy, Loader2 } from 'lucide-react'
+import Link from 'next/link'
 
 export default function SetupVendorsPage() {
   const [status, setStatus] = useState('')
@@ -160,9 +161,9 @@ CREATE POLICY "Sellers can delete their vendors" ON vendors
             <h3 className="text-lg font-semibold mb-2">After Setup</h3>
             <p className="text-sm text-gray-600">
               Once you&apos;ve created the table, go back to the{' '}
-              <a href="/seller/vendors" className="text-blue-600 hover:underline">
+              <Link href="/seller/vendors" className="text-blue-600 hover:underline">
                 Vendors page
-              </a>{' '}
+              </Link>{' '}
               and try adding a vendor again.
             </p>
           </div>

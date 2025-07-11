@@ -124,7 +124,7 @@ export default function PurchaseOrdersTable({ vendorId }) {
             No purchase orders yet
           </h3>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            You'll see purchase orders from your sellers here
+            You&apos;ll see purchase orders from your sellers here
           </p>
         </div>
       ) : (

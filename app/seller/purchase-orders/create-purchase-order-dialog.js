@@ -369,7 +369,7 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
             </Select>
             {items.length > 0 && (
               <p className="text-sm text-slate-500">
-                Supplier cannot be changed after adding items. Use "Clear Form" to start over.
+                Supplier cannot be changed after adding items. Use &quot;Clear Form&quot; to start over.
               </p>
             )}
           </div>
