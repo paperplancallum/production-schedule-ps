@@ -484,18 +484,9 @@ export function SupplierTable() {
     <div>
       <SupplierFilters 
         onFiltersChange={setFilters}
+        onRefresh={fetchSuppliers}
+        refreshing={loading}
       />
-      
-      <div className="flex justify-end mb-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={fetchSuppliers}
-          disabled={loading}
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
-      </div>
 
       {loading ? (
         <div className="flex items-center justify-center p-8">

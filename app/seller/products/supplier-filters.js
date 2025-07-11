@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
-import { X, Plus, Trash2, Filter, ChevronDown } from 'lucide-react'
+import { X, Plus, Trash2, Filter, ChevronDown, RefreshCw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
@@ -71,7 +71,7 @@ const OPERATOR_OPTIONS = {
   ],
 }
 
-export default function SupplierFilters({ onFiltersChange }) {
+export default function SupplierFilters({ onFiltersChange, onRefresh, refreshing }) {
   const [conditions, setConditions] = useState([
     { id: 'cond-1', field: '', operator: '', value: '' }
   ])
@@ -125,29 +125,42 @@ export default function SupplierFilters({ onFiltersChange }) {
 
   return (
     <div className="mb-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-2"
-        >
-          <Filter className="h-4 w-4" />
-          Filters
-          {activeCount > 0 && (
-            <Badge variant="secondary" className="ml-1">
-              {activeCount}
-            </Badge>
-          )}
-        </Button>
-        {activeCount > 0 && (
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            onClick={clearAllFilters}
-            className="text-muted-foreground"
+            onClick={() => setIsOpen(!isOpen)}
+            className="flex items-center gap-2"
           >
-            Clear all
+            <Filter className="h-4 w-4" />
+            Filters
+            {activeCount > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {activeCount}
+              </Badge>
+            )}
+          </Button>
+          {activeCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAllFilters}
+              className="text-muted-foreground"
+            >
+              Clear all
+            </Button>
+          )}
+        </div>
+        {onRefresh && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="h-8 w-8"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         )}
       </div>
