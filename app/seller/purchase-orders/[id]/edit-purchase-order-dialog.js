@@ -74,7 +74,9 @@ export default function EditPurchaseOrderDialog({
         unit_price: 0,
         product: null,
         product_supplier: null,
-        price_tier: null
+        price_tier: null,
+        sku: '',
+        product_name: ''
       }]
     })
   }
@@ -102,6 +104,12 @@ export default function EditPurchaseOrderDialog({
         const productSupplier = product.product_suppliers?.find(ps => ps.vendor_id === order.supplier_id)
         const defaultTier = productSupplier?.price_tiers?.[0]
         
+        // Calculate the minimum quantity based on MOQ and price tier
+        const minQuantity = Math.max(
+          defaultTier?.minimum_order_quantity || 1,
+          productSupplier?.moq || 1
+        )
+        
         newItems[index] = {
           ...newItems[index],
           product_id: product.id,
@@ -112,7 +120,8 @@ export default function EditPurchaseOrderDialog({
           product_supplier: productSupplier,
           price_tier: defaultTier,
           sku: product.sku,
-          product_name: product.product_name
+          product_name: product.product_name,
+          quantity: Math.max(newItems[index].quantity || 1, minQuantity)
         }
       }
     } else if (field === 'price_tier_id') {
@@ -121,11 +130,18 @@ export default function EditPurchaseOrderDialog({
       
       const tier = productSupplier?.price_tiers?.find(t => t.id === value)
       if (tier) {
+        // If current quantity is less than the tier's MOQ, update it
+        const minQuantity = Math.max(
+          tier.minimum_order_quantity || 1,
+          newItems[index].product_supplier?.moq || 1
+        )
+        
         newItems[index] = {
           ...newItems[index],
           price_tier_id: tier.id,
           unit_price: tier.unit_price,
-          price_tier: tier
+          price_tier: tier,
+          quantity: Math.max(newItems[index].quantity || 1, minQuantity)
         }
       }
     } else if (field === 'quantity') {
@@ -203,7 +219,6 @@ export default function EditPurchaseOrderDialog({
           notes: formData.notes,
           trade_terms: formData.trade_terms,
           subtotal: subtotal,
-          total_amount: subtotal,
           items: formData.items.map(item => ({
             id: item.id, // Include ID for existing items
             product_id: item.product_id,

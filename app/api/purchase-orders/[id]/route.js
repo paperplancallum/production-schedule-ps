@@ -183,7 +183,6 @@ export async function PUT(request, { params }) {
         notes: body.notes,
         trade_terms: body.trade_terms,
         subtotal: body.subtotal,
-        total_amount: body.total_amount,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
