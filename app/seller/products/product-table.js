@@ -108,6 +108,8 @@ function ProductSuppliers({ productId, productName }) {
       if (!error && data) {
         console.log('Filtered suppliers:', data)
         setVendors(data)
+      } else if (error) {
+        console.error('Error fetching vendors:', error)
       }
     } catch (error) {
       console.error('Error fetching vendors:', error)
