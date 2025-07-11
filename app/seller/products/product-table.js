@@ -38,6 +38,7 @@ function ProductSuppliers({ productId, productName }) {
   const [suppliers, setSuppliers] = useState([])
   const [loading, setLoading] = useState(true)
   const [isAddingSupplier, setIsAddingSupplier] = useState(false)
+  const [editingSupplier, setEditingSupplier] = useState(null)
   const [newSupplier, setNewSupplier] = useState({
     vendor_id: '',
     lead_time_days: '',
@@ -232,6 +233,99 @@ function ProductSuppliers({ productId, productName }) {
     }
   }
 
+  const handleEditSupplier = (supplier) => {
+    setEditingSupplier(supplier)
+    setNewSupplier({
+      vendor_id: supplier.vendor_id,
+      lead_time_days: supplier.lead_time_days.toString(),
+      price_tiers: supplier.supplier_price_tiers && supplier.supplier_price_tiers.length > 0
+        ? supplier.supplier_price_tiers.map(tier => ({
+            id: tier.id,
+            minimum_order_quantity: tier.minimum_order_quantity.toString(),
+            unit_price: tier.unit_price.toString()
+          }))
+        : [{ minimum_order_quantity: '', unit_price: '' }]
+    })
+    setIsAddingSupplier(true)
+  }
+
+  const handleUpdateSupplier = async (e) => {
+    e.preventDefault()
+    
+    try {
+      // Validate price tiers
+      const validTiers = newSupplier.price_tiers.filter(
+        tier => tier.minimum_order_quantity && tier.unit_price
+      )
+      
+      if (validTiers.length === 0) {
+        toast.error('Please add at least one price tier')
+        return
+      }
+
+      // Update supplier
+      const supplierData = {
+        lead_time_days: parseInt(newSupplier.lead_time_days),
+        // We'll use the first tier's values for backward compatibility
+        minimum_order_quantity: parseInt(validTiers[0].minimum_order_quantity),
+        unit_price: parseFloat(validTiers[0].unit_price),
+      }
+
+      const { error: supplierError } = await supabase
+        .from('product_suppliers')
+        .update(supplierData)
+        .eq('id', editingSupplier.id)
+
+      if (supplierError) throw supplierError
+
+      // Handle price tiers
+      // First, check if price tiers table exists
+      const { data: existingTiers, error: fetchError } = await supabase
+        .from('supplier_price_tiers')
+        .select('id')
+        .eq('product_supplier_id', editingSupplier.id)
+
+      if (!fetchError || !fetchError.message.includes('supplier_price_tiers')) {
+        // Table exists, so we can manage tiers
+        // Delete existing tiers
+        if (existingTiers && existingTiers.length > 0) {
+          await supabase
+            .from('supplier_price_tiers')
+            .delete()
+            .eq('product_supplier_id', editingSupplier.id)
+        }
+
+        // Add new tiers
+        const tierData = validTiers.map(tier => ({
+          product_supplier_id: editingSupplier.id,
+          minimum_order_quantity: parseInt(tier.minimum_order_quantity),
+          unit_price: parseFloat(tier.unit_price),
+        }))
+
+        const { error: tierError } = await supabase
+          .from('supplier_price_tiers')
+          .insert(tierData)
+
+        if (tierError && !tierError.message.includes('supplier_price_tiers')) {
+          throw tierError
+        }
+      }
+
+      toast.success('Supplier updated successfully')
+      setIsAddingSupplier(false)
+      setEditingSupplier(null)
+      setNewSupplier({
+        vendor_id: '',
+        lead_time_days: '',
+        price_tiers: [{ minimum_order_quantity: '', unit_price: '' }],
+      })
+      fetchSuppliers()
+    } catch (error) {
+      console.error('Error updating supplier:', error)
+      toast.error('Failed to update supplier')
+    }
+  }
+
   const handleDeleteSupplier = async (supplierId) => {
     if (!confirm('Are you sure you want to remove this supplier?')) return
 
@@ -308,14 +402,24 @@ function ProductSuppliers({ productId, productName }) {
                       {supplier.supplier_price_tiers?.length || 0} tier(s)
                     </td>
                     <td className="p-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleDeleteSupplier(supplier.id)}
-                        className="h-7 w-7 p-0 hover:bg-slate-100"
-                      >
-                        <Trash2 className="h-3 w-3 text-slate-500" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleEditSupplier(supplier)}
+                          className="h-7 w-7 p-0 hover:bg-slate-100"
+                        >
+                          <Pencil className="h-3 w-3 text-slate-500" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleDeleteSupplier(supplier.id)}
+                          className="h-7 w-7 p-0 hover:bg-slate-100"
+                        >
+                          <Trash2 className="h-3 w-3 text-slate-500" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                   {expandedSuppliers[supplier.id] && (
@@ -346,40 +450,58 @@ function ProductSuppliers({ productId, productName }) {
         </div>
       )}
 
-      <Sheet open={isAddingSupplier} onOpenChange={setIsAddingSupplier}>
+      <Sheet open={isAddingSupplier} onOpenChange={(open) => {
+        setIsAddingSupplier(open)
+        if (!open) {
+          setEditingSupplier(null)
+          setNewSupplier({
+            vendor_id: '',
+            lead_time_days: '',
+            price_tiers: [{ minimum_order_quantity: '', unit_price: '' }],
+          })
+        }
+      }}>
         <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Add Supplier</SheetTitle>
+            <SheetTitle>{editingSupplier ? 'Edit Supplier' : 'Add Supplier'}</SheetTitle>
             <SheetDescription>
-              Add a supplier for {productName}
+              {editingSupplier ? `Update supplier details for ${productName}` : `Add a supplier for ${productName}`}
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleAddSupplier} className="flex flex-col h-full">
+          <form onSubmit={editingSupplier ? handleUpdateSupplier : handleAddSupplier} className="flex flex-col h-full">
             <div className="space-y-4 px-6 pt-4 pb-4 flex-1 overflow-y-auto">
               <div className="space-y-2">
-                <Label>Supplier *</Label>
-                <Select
-                  value={newSupplier.vendor_id}
-                  onValueChange={(value) => setNewSupplier({ ...newSupplier, vendor_id: value })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a supplier" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vendors.length === 0 ? (
-                      <SelectItem value="no-suppliers" disabled>
-                        {suppliers.length > 0 ? 'All available suppliers have been added' : 'No suppliers available'}
-                      </SelectItem>
-                    ) : (
-                      vendors.map((vendor) => (
-                        <SelectItem key={vendor.id} value={vendor.id}>
-                          {vendor.vendor_name}
+                <Label>Supplier {editingSupplier && <span className="text-xs text-muted-foreground ml-2">(Cannot be changed)</span>}</Label>
+                {editingSupplier ? (
+                  <Input
+                    value={editingSupplier.vendors?.vendor_name || 'Unknown'}
+                    disabled
+                    className="bg-gray-100"
+                  />
+                ) : (
+                  <Select
+                    value={newSupplier.vendor_id}
+                    onValueChange={(value) => setNewSupplier({ ...newSupplier, vendor_id: value })}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a supplier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendors.length === 0 ? (
+                        <SelectItem value="no-suppliers" disabled>
+                          {suppliers.length > 0 ? 'All available suppliers have been added' : 'No suppliers available'}
                         </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                      ) : (
+                        vendors.map((vendor) => (
+                          <SelectItem key={vendor.id} value={vendor.id}>
+                            {vendor.vendor_name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lead_time">Lead Time (days) *</Label>
@@ -461,7 +583,7 @@ function ProductSuppliers({ productId, productName }) {
             </div>
             <div className="px-6 py-4 border-t">
               <Button type="submit" className="w-full">
-                Add Supplier
+                {editingSupplier ? 'Update Supplier' : 'Add Supplier'}
               </Button>
             </div>
           </form>

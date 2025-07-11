@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Mail, Loader2, MoreHorizontal, Trash2, Edit2, RefreshCw } from 'lucide-react'
+import { Plus, Mail, Loader2, MoreHorizontal, Trash2, Edit2, RefreshCw, Eye } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import {
@@ -439,6 +439,12 @@ export default function VendorTable({ initialVendors, currentUserId }) {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => router.push(`/seller/vendors/${vendor.id}`)}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                View
+              </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => handleEditVendor(vendor)}
               >
