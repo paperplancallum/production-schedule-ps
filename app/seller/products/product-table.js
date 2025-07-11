@@ -121,6 +121,9 @@ export function ProductTable() {
     sku: '',
     price: '',
   })
+  const [formErrors, setFormErrors] = useState({
+    sku: '',
+  })
   const supabase = createClient()
 
   useEffect(() => {
@@ -181,6 +184,8 @@ export function ProductTable() {
 
   const handleAddProduct = async (e) => {
     e.preventDefault()
+    setFormErrors({ sku: '' }) // Clear previous errors
+    
     try {
       const { data: userData, error: userError } = await supabase.auth.getUser()
       
@@ -208,12 +213,20 @@ export function ProductTable() {
 
       const { error } = await supabase.from('products').insert([productData])
 
-      if (error) throw error
+      if (error) {
+        // Check if it's a duplicate SKU error
+        if (error.code === '23505' && error.message.includes('sku')) {
+          setFormErrors({ sku: 'This Internal SKU already exists in your products, please use something different' })
+          return
+        }
+        throw error
+      }
 
       toast.success('Product added successfully')
 
       setIsAddingProduct(false)
       resetForm()
+      setFormErrors({ sku: '' })
       fetchProducts()
     } catch (error) {
       console.error('Error adding product:', error)
@@ -225,6 +238,8 @@ export function ProductTable() {
 
   const handleEditProduct = async (e) => {
     e.preventDefault()
+    setFormErrors({ sku: '' }) // Clear previous errors
+    
     try {
       const productData = {
         product_name: formData.product_name,
@@ -237,12 +252,20 @@ export function ProductTable() {
         .update(productData)
         .eq('id', editingProduct.id)
 
-      if (error) throw error
+      if (error) {
+        // Check if it's a duplicate SKU error
+        if (error.code === '23505' && error.message.includes('sku')) {
+          setFormErrors({ sku: 'This Internal SKU already exists in your products, please use something different' })
+          return
+        }
+        throw error
+      }
 
       toast.success('Product updated successfully')
 
       setEditingProduct(null)
       resetForm()
+      setFormErrors({ sku: '' })
       fetchProducts()
     } catch (error) {
       console.error('Error updating product:', error)
@@ -278,6 +301,9 @@ export function ProductTable() {
       sku: '',
       price: '',
     })
+    setFormErrors({
+      sku: '',
+    })
   }
 
   const openEditSheet = (product) => {
@@ -285,6 +311,9 @@ export function ProductTable() {
       product_name: product.product_name || '',
       sku: product.sku || '',
       price: product.price || '',
+    })
+    setFormErrors({
+      sku: '',
     })
     setEditingProduct(product)
   }
@@ -325,11 +354,16 @@ export function ProductTable() {
                     <Input
                       id="sku"
                       value={formData.sku}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setFormData({ ...formData, sku: e.target.value })
-                      }
+                        setFormErrors({ ...formErrors, sku: '' }) // Clear error on change
+                      }}
                       required
+                      className={formErrors.sku ? 'border-red-500' : ''}
                     />
+                    {formErrors.sku && (
+                      <p className="text-sm text-red-500 mt-1">{formErrors.sku}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="price">Price</Label>
@@ -393,11 +427,16 @@ export function ProductTable() {
                 <Input
                   id="edit_sku"
                   value={formData.sku}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setFormData({ ...formData, sku: e.target.value })
-                  }
+                    setFormErrors({ ...formErrors, sku: '' }) // Clear error on change
+                  }}
                   required
+                  className={formErrors.sku ? 'border-red-500' : ''}
                 />
+                {formErrors.sku && (
+                  <p className="text-sm text-red-500 mt-1">{formErrors.sku}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit_price">Price</Label>
