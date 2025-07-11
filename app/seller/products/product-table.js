@@ -1248,16 +1248,18 @@ export function ProductTable() {
     setSelectedRows({})
   }
 
-  const toolbar = (
-    <>
-      <Sheet open={isAddingProduct} onOpenChange={setIsAddingProduct}>
-        <SheetTrigger asChild>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Product
-          </Button>
-        </SheetTrigger>
-        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex gap-2">
+          <Sheet open={isAddingProduct} onOpenChange={setIsAddingProduct}>
+            <SheetTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Product
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
               <SheetHeader>
                 <SheetTitle>Add New Product</SheetTitle>
                 <SheetDescription>
@@ -1300,17 +1302,19 @@ export function ProductTable() {
                   </Button>
                 </div>
               </form>
-        </SheetContent>
-      </Sheet>
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={fetchProducts}
-        disabled={loading}
-      >
-        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-      </Button>
-      {Object.keys(selectedRows).length > 0 && (() => {
+            </SheetContent>
+          </Sheet>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={fetchProducts}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          {Object.keys(selectedRows).length > 0 && (() => {
             const selectedIds = Object.keys(selectedRows).filter(id => selectedRows[id])
             const selectedProducts = products.filter(product => selectedIds.includes(product.id))
             const suppliers = [...new Set(selectedProducts.map(product => product.primary_supplier_name).filter(Boolean))]

@@ -14,23 +14,10 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Build query
+    // Build query - fetch purchase orders first without joins to avoid RLS issues
     let query = supabase
       .from('purchase_orders')
-      .select(`
-        *,
-        items:purchase_order_items(
-          id,
-          quantity,
-          unit_price,
-          line_total,
-          product:products(
-            id,
-            product_name,
-            sku
-          )
-        )
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
 
     // Filter by vendor if provided
@@ -50,23 +37,41 @@ export async function GET(request) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    // Fetch vendor information separately for each order
-    const ordersWithSuppliers = await Promise.all(
+    // Fetch vendor information and items separately for each order
+    const ordersWithDetails = await Promise.all(
       data.map(async (order) => {
+        // Fetch supplier info
         const { data: supplier } = await supabase
           .from('vendors')
           .select('id, vendor_name, vendor_type')
           .eq('id', order.supplier_id)
           .single()
         
+        // Fetch order items
+        const { data: items } = await supabase
+          .from('purchase_order_items')
+          .select(`
+            id,
+            quantity,
+            unit_price,
+            line_total,
+            product:products(
+              id,
+              product_name,
+              sku
+            )
+          `)
+          .eq('purchase_order_id', order.id)
+        
         return {
           ...order,
-          supplier
+          supplier,
+          items: items || []
         }
       })
     )
 
-    return NextResponse.json(ordersWithSuppliers)
+    return NextResponse.json(ordersWithDetails)
   } catch (error) {
     console.error('Error in GET /api/purchase-orders:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -156,23 +161,10 @@ export async function POST(request) {
       return NextResponse.json({ error: itemsError.message }, { status: 400 })
     }
 
-    // Fetch the complete purchase order with items
+    // Fetch the complete purchase order without joins
     const { data: completeOrder, error: fetchError } = await supabase
       .from('purchase_orders')
-      .select(`
-        *,
-        items:purchase_order_items(
-          id,
-          quantity,
-          unit_price,
-          line_total,
-          product:products(
-            id,
-            product_name,
-            sku
-          )
-        )
-      `)
+      .select('*')
       .eq('id', purchaseOrder.id)
       .single()
 
@@ -180,6 +172,22 @@ export async function POST(request) {
       console.error('Error fetching complete order:', fetchError)
       return NextResponse.json({ error: fetchError.message }, { status: 400 })
     }
+
+    // Fetch order items separately
+    const { data: items } = await supabase
+      .from('purchase_order_items')
+      .select(`
+        id,
+        quantity,
+        unit_price,
+        line_total,
+        product:products(
+          id,
+          product_name,
+          sku
+        )
+      `)
+      .eq('purchase_order_id', purchaseOrder.id)
 
     // Fetch supplier information separately
     const { data: supplier } = await supabase
@@ -190,7 +198,8 @@ export async function POST(request) {
 
     const orderWithSupplier = {
       ...completeOrder,
-      supplier
+      supplier,
+      items: items || []
     }
 
     return NextResponse.json(orderWithSupplier, { status: 201 })

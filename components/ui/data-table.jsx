@@ -29,7 +29,6 @@ export function DataTable({
   meta,
   rowSelection,
   onRowSelectionChange,
-  toolbar,
 }) {
   const [sorting, setSorting] = React.useState([])
   const [columnFilters, setColumnFilters] = React.useState([])
@@ -62,8 +61,8 @@ export function DataTable({
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between py-4">
-        {searchKey && (
+      {searchKey && (
+        <div className="flex items-center py-4">
           <Input
             placeholder={`Filter ${searchKey}...`}
             value={(table.getColumn(searchKey)?.getFilterValue()) ?? ""}
@@ -72,9 +71,8 @@ export function DataTable({
             }
             className="max-w-sm"
           />
-        )}
-        {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
-      </div>
+        </div>
+      )}
       <div className="rounded-md border border-slate-200 bg-white">
         <Table>
           <TableHeader>
