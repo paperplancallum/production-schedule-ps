@@ -48,7 +48,7 @@ export async function GET(request) {
           .single()
         
         // Fetch order items
-        const { data: items } = await supabase
+        const { data: orderItems } = await supabase
           .from('purchase_order_items')
           .select(`
             id,
@@ -66,7 +66,7 @@ export async function GET(request) {
         return {
           ...order,
           supplier,
-          items: items || []
+          items: orderItems || []
         }
       })
     )
@@ -174,7 +174,7 @@ export async function POST(request) {
     }
 
     // Fetch order items separately
-    const { data: items } = await supabase
+    const { data: orderItems } = await supabase
       .from('purchase_order_items')
       .select(`
         id,
@@ -199,7 +199,7 @@ export async function POST(request) {
     const orderWithSupplier = {
       ...completeOrder,
       supplier,
-      items: items || []
+      items: orderItems || []
     }
 
     return NextResponse.json(orderWithSupplier, { status: 201 })
