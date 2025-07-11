@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/client'
 import { DataTable } from '@/components/ui/data-table'
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,14 +23,6 @@ import {
 } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -55,15 +46,6 @@ const columns = [
     ),
   },
   {
-    accessorKey: 'category',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Category" />
-    ),
-    cell: ({ row }) => (
-      <div className="text-slate-600">{row.getValue('category') || '-'}</div>
-    ),
-  },
-  {
     accessorKey: 'price',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Price" />
@@ -72,46 +54,8 @@ const columns = [
       const price = row.getValue('price')
       return (
         <div className="font-medium">
-          {price ? `$${parseFloat(price).toFixed(2)}` : '-'}
+          {price ? `$${parseFloat(price).toFixed(2)}` : 'Calculated'}
         </div>
-      )
-    },
-  },
-  {
-    accessorKey: 'stock_quantity',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Stock" />
-    ),
-    cell: ({ row }) => (
-      <div className="text-center">{row.getValue('stock_quantity') || 0}</div>
-    ),
-  },
-  {
-    accessorKey: 'status',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Status" />
-    ),
-    cell: ({ row }) => {
-      const status = row.getValue('status')
-      return (
-        <Badge
-          variant={
-            status === 'active'
-              ? 'default'
-              : status === 'inactive'
-              ? 'secondary'
-              : 'outline'
-          }
-          className={
-            status === 'active'
-              ? 'bg-green-100 text-green-800 hover:bg-green-200'
-              : status === 'inactive'
-              ? 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-              : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-          }
-        >
-          {status}
-        </Badge>
       )
     },
   },
@@ -175,13 +119,7 @@ export function ProductTable() {
   const [formData, setFormData] = useState({
     product_name: '',
     sku: '',
-    description: '',
-    category: '',
     price: '',
-    cost: '',
-    stock_quantity: 0,
-    unit_of_measure: '',
-    status: 'active',
   })
   const supabase = createClient()
 
@@ -261,11 +199,11 @@ export function ProductTable() {
       }
 
       const productData = {
-        ...formData,
+        product_name: formData.product_name,
+        sku: formData.sku,
         seller_id: sellerData.id,
         price: formData.price ? parseFloat(formData.price) : null,
-        cost: formData.cost ? parseFloat(formData.cost) : null,
-        stock_quantity: parseInt(formData.stock_quantity) || 0,
+        status: 'active', // Default status
       }
 
       const { error } = await supabase.from('products').insert([productData])
@@ -289,10 +227,9 @@ export function ProductTable() {
     e.preventDefault()
     try {
       const productData = {
-        ...formData,
+        product_name: formData.product_name,
+        sku: formData.sku,
         price: formData.price ? parseFloat(formData.price) : null,
-        cost: formData.cost ? parseFloat(formData.cost) : null,
-        stock_quantity: parseInt(formData.stock_quantity) || 0,
       }
 
       const { error } = await supabase
@@ -339,13 +276,7 @@ export function ProductTable() {
     setFormData({
       product_name: '',
       sku: '',
-      description: '',
-      category: '',
       price: '',
-      cost: '',
-      stock_quantity: 0,
-      unit_of_measure: '',
-      status: 'active',
     })
   }
 
@@ -353,13 +284,7 @@ export function ProductTable() {
     setFormData({
       product_name: product.product_name || '',
       sku: product.sku || '',
-      description: product.description || '',
-      category: product.category || '',
       price: product.price || '',
-      cost: product.cost || '',
-      stock_quantity: product.stock_quantity || 0,
-      unit_of_measure: product.unit_of_measure || '',
-      status: product.status || 'active',
     })
     setEditingProduct(product)
   }
@@ -375,57 +300,37 @@ export function ProductTable() {
                 Add Product
               </Button>
             </SheetTrigger>
-            <SheetContent>
+            <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
               <SheetHeader>
                 <SheetTitle>Add New Product</SheetTitle>
                 <SheetDescription>
                   Enter the details for your new product.
                 </SheetDescription>
               </SheetHeader>
-              <form onSubmit={handleAddProduct} className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="product_name">Product Name *</Label>
-                  <Input
-                    id="product_name"
-                    value={formData.product_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, product_name: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sku">SKU</Label>
-                  <Input
-                    id="sku"
-                    value={formData.sku}
-                    onChange={(e) =>
-                      setFormData({ ...formData, sku: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Input
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleAddProduct} className="flex flex-col h-full">
+                <div className="space-y-4 px-6 pt-4 pb-4 flex-1 overflow-y-auto">
+                  <div className="space-y-2">
+                    <Label htmlFor="product_name">Product Name *</Label>
+                    <Input
+                      id="product_name"
+                      value={formData.product_name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, product_name: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sku">SKU *</Label>
+                    <Input
+                      id="sku"
+                      value={formData.sku}
+                      onChange={(e) =>
+                        setFormData({ ...formData, sku: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="price">Price</Label>
                     <Input
@@ -436,72 +341,18 @@ export function ProductTable() {
                       onChange={(e) =>
                         setFormData({ ...formData, price: e.target.value })
                       }
+                      placeholder="Will be inherited from function"
+                      disabled
+                      className="bg-gray-100"
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cost">Cost</Label>
-                    <Input
-                      id="cost"
-                      type="number"
-                      step="0.01"
-                      value={formData.cost}
-                      onChange={(e) =>
-                        setFormData({ ...formData, cost: e.target.value })
-                      }
-                    />
+                    <p className="text-xs text-muted-foreground">Price will be calculated automatically</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="stock_quantity">Stock Quantity</Label>
-                    <Input
-                      id="stock_quantity"
-                      type="number"
-                      value={formData.stock_quantity}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          stock_quantity: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unit_of_measure">Unit of Measure</Label>
-                    <Input
-                      id="unit_of_measure"
-                      value={formData.unit_of_measure}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          unit_of_measure: e.target.value,
-                        })
-                      }
-                      placeholder="e.g., pcs, kg, lbs"
-                    />
-                  </div>
+                <div className="px-6 py-4 border-t">
+                  <Button type="submit" className="w-full">
+                    Add Product
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, status: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button type="submit" className="w-full">
-                  Add Product
-                </Button>
               </form>
             </SheetContent>
           </Sheet>
@@ -517,57 +368,37 @@ export function ProductTable() {
       </div>
 
       <Sheet open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
-        <SheetContent>
+        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Edit Product</SheetTitle>
             <SheetDescription>
               Update the product details.
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleEditProduct} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit_product_name">Product Name *</Label>
-              <Input
-                id="edit_product_name"
-                value={formData.product_name}
-                onChange={(e) =>
-                  setFormData({ ...formData, product_name: e.target.value })
-                }
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit_sku">SKU</Label>
-              <Input
-                id="edit_sku"
-                value={formData.sku}
-                onChange={(e) =>
-                  setFormData({ ...formData, sku: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit_description">Description</Label>
-              <Textarea
-                id="edit_description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit_category">Category</Label>
-              <Input
-                id="edit_category"
-                value={formData.category}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleEditProduct} className="flex flex-col h-full">
+            <div className="space-y-4 px-6 pt-4 pb-4 flex-1 overflow-y-auto">
+              <div className="space-y-2">
+                <Label htmlFor="edit_product_name">Product Name *</Label>
+                <Input
+                  id="edit_product_name"
+                  value={formData.product_name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, product_name: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_sku">SKU *</Label>
+                <Input
+                  id="edit_sku"
+                  value={formData.sku}
+                  onChange={(e) =>
+                    setFormData({ ...formData, sku: e.target.value })
+                  }
+                  required
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="edit_price">Price</Label>
                 <Input
@@ -578,72 +409,18 @@ export function ProductTable() {
                   onChange={(e) =>
                     setFormData({ ...formData, price: e.target.value })
                   }
+                  placeholder="Will be inherited from function"
+                  disabled
+                  className="bg-gray-100"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_cost">Cost</Label>
-                <Input
-                  id="edit_cost"
-                  type="number"
-                  step="0.01"
-                  value={formData.cost}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cost: e.target.value })
-                  }
-                />
+                <p className="text-xs text-muted-foreground">Price will be calculated automatically</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit_stock_quantity">Stock Quantity</Label>
-                <Input
-                  id="edit_stock_quantity"
-                  type="number"
-                  value={formData.stock_quantity}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      stock_quantity: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_unit_of_measure">Unit of Measure</Label>
-                <Input
-                  id="edit_unit_of_measure"
-                  value={formData.unit_of_measure}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      unit_of_measure: e.target.value,
-                    })
-                  }
-                  placeholder="e.g., pcs, kg, lbs"
-                />
-              </div>
+            <div className="px-6 py-4 border-t">
+              <Button type="submit" className="w-full">
+                Update Product
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit_status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, status: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button type="submit" className="w-full">
-              Update Product
-            </Button>
           </form>
         </SheetContent>
       </Sheet>
