@@ -58,7 +58,9 @@ function ProductSuppliers({ productId, productName }) {
   const fetchSuppliers = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
+      
+      // First try to fetch with price tiers
+      let { data, error } = await supabase
         .from('product_suppliers')
         .select(`
           *,
@@ -76,18 +78,46 @@ function ProductSuppliers({ productId, productName }) {
         .eq('product_id', productId)
         .order('created_at', { ascending: false })
 
+      // If error mentions supplier_price_tiers, fetch without it
+      if (error && error.message && error.message.includes('supplier_price_tiers')) {
+        console.log('Price tiers table not available, fetching without tiers')
+        const fallbackResult = await supabase
+          .from('product_suppliers')
+          .select(`
+            *,
+            vendors (
+              id,
+              vendor_name,
+              vendor_type
+            )
+          `)
+          .eq('product_id', productId)
+          .order('created_at', { ascending: false })
+        
+        data = fallbackResult.data
+        error = fallbackResult.error
+      }
+
       if (error) {
         console.error('Error fetching suppliers:', error)
+        console.error('Error details:', error.message, error.details, error.hint)
         setSuppliers([])
         return
       }
 
-      // Sort price tiers by MOQ for each supplier
+      // Sort price tiers by MOQ for each supplier (if they exist)
       const suppliersWithSortedTiers = (data || []).map(supplier => ({
         ...supplier,
-        supplier_price_tiers: (supplier.supplier_price_tiers || []).sort(
-          (a, b) => a.minimum_order_quantity - b.minimum_order_quantity
-        )
+        supplier_price_tiers: supplier.supplier_price_tiers 
+          ? (supplier.supplier_price_tiers || []).sort(
+              (a, b) => a.minimum_order_quantity - b.minimum_order_quantity
+            )
+          : supplier.minimum_order_quantity && supplier.unit_price
+            ? [{ 
+                minimum_order_quantity: supplier.minimum_order_quantity, 
+                unit_price: supplier.unit_price 
+              }]
+            : []
       }))
 
       setSuppliers(suppliersWithSortedTiers)
@@ -163,7 +193,7 @@ function ProductSuppliers({ productId, productName }) {
         throw supplierError
       }
 
-      // Add price tiers
+      // Try to add price tiers
       const tierData = validTiers.map(tier => ({
         product_supplier_id: supplierResult.id,
         minimum_order_quantity: parseInt(tier.minimum_order_quantity),
@@ -175,12 +205,17 @@ function ProductSuppliers({ productId, productName }) {
         .insert(tierData)
 
       if (tierError) {
-        // Rollback supplier if tiers fail
-        await supabase
-          .from('product_suppliers')
-          .delete()
-          .eq('id', supplierResult.id)
-        throw tierError
+        // If price tiers table doesn't exist, just log warning and continue
+        if (tierError.message && tierError.message.includes('supplier_price_tiers')) {
+          console.warn('Price tiers table not available, supplier added without tiers')
+        } else {
+          // For other errors, rollback supplier
+          await supabase
+            .from('product_suppliers')
+            .delete()
+            .eq('id', supplierResult.id)
+          throw tierError
+        }
       }
 
       toast.success('Supplier added successfully')

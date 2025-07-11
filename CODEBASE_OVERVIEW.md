@@ -120,6 +120,11 @@ All tables use RLS policies to ensure:
 - Toast notifications use `sonner` library
 - Supabase client is in `/lib/supabase/client`
 
+### "supplier_price_tiers" table doesn't exist
+- Run the SQL in `RUN_THIS_IN_SUPABASE.sql` directly in Supabase dashboard
+- The app gracefully handles missing price tiers table
+- Falls back to legacy single-price display if table missing
+
 ## Development Commands
 ```bash
 # Start development server
