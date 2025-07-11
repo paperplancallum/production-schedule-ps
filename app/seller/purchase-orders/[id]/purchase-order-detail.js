@@ -396,16 +396,16 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
             <CardContent className="space-y-3">
               <div>
                 <Label className="text-sm text-gray-500">Company</Label>
-                <p className="font-medium">{order.supplier.vendor_name || 'Unknown'}</p>
+                <p className="font-medium">{order.supplier?.vendor_name || 'Unknown'}</p>
               </div>
               <div>
                 <Label className="text-sm text-gray-500">Email</Label>
-                <p className="font-medium">{order.supplier.vendor_email || '-'}</p>
+                <p className="font-medium">{order.supplier?.vendor_email || '-'}</p>
               </div>
-              {order.supplier.vendor_phone && (
+              {order.supplier?.vendor_phone && (
                 <div>
                   <Label className="text-sm text-gray-500">Phone</Label>
-                  <p className="font-medium">{order.supplier.vendor_phone}</p>
+                  <p className="font-medium">{order.supplier?.vendor_phone}</p>
                 </div>
               )}
             </CardContent>

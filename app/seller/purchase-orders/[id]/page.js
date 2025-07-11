@@ -22,6 +22,15 @@ export default async function PurchaseOrderPage({ params }) {
     .select('id, vendor_name, vendor_type, vendor_email, vendor_phone')
     .eq('id', order.supplier_id)
     .single()
+  
+  // If supplier not found, use a default object
+  const supplierData = supplier || {
+    id: order.supplier_id,
+    vendor_name: 'Unknown Supplier',
+    vendor_type: 'unknown',
+    vendor_email: '',
+    vendor_phone: ''
+  }
 
   // Fetch order items with related data
   const { data: items } = await supabase
@@ -78,7 +87,7 @@ export default async function PurchaseOrderPage({ params }) {
   // Combine all data
   const orderWithDetails = {
     ...order,
-    supplier,
+    supplier: supplierData,
     items: itemsWithDetails,
     status_history: statusHistory || []
   }
