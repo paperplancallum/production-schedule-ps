@@ -19,7 +19,7 @@ export async function GET(request) {
       .from('purchase_orders')
       .select(`
         *,
-        supplier:vendors!supplier_id(
+        supplier:vendors!purchase_orders_supplier_id_fkey(
           id,
           vendor_name,
           vendor_type
@@ -138,12 +138,10 @@ export async function POST(request) {
       .from('purchase_orders')
       .select(`
         *,
-        supplier:vendors!supplier_id(
+        supplier:vendors!purchase_orders_supplier_id_fkey(
           id,
-          vendor_code,
-          profile:profiles!vendors_id_fkey(
-            company_name
-          )
+          vendor_name,
+          vendor_type
         ),
         items:purchase_order_items(
           id,
