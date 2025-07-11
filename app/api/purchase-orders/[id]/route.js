@@ -126,19 +126,25 @@ export async function PATCH(request, { params }) {
 
     // Validate status transitions
     if (body.status) {
-      const validTransitions = {
-        'draft': ['sent_to_supplier', 'cancelled'],
-        'sent_to_supplier': ['approved', 'cancelled'],
-        'approved': isVendor ? ['in_progress'] : ['in_progress', 'cancelled'],
-        'in_progress': isVendor ? ['approved', 'complete'] : ['complete', 'cancelled'],
-        'complete': [],
-        'cancelled': []
-      }
+      // For vendors, we need to check if the transition is valid even if the seller status doesn't change
+      // This is because multiple vendor statuses map to the same seller status
+      if (isVendor && body.status === existingOrder.status) {
+        // Allow the update to proceed - the vendor status may be changing even if seller status isn't
+      } else {
+        const validTransitions = {
+          'draft': ['sent_to_supplier', 'cancelled'],
+          'sent_to_supplier': ['approved', 'cancelled'],
+          'approved': isVendor ? ['in_progress'] : ['in_progress', 'cancelled'],
+          'in_progress': isVendor ? ['approved', 'complete'] : ['complete', 'cancelled'],
+          'complete': [],
+          'cancelled': []
+        }
 
-      if (!validTransitions[existingOrder.status]?.includes(body.status)) {
-        return NextResponse.json({ 
-          error: `Cannot transition from ${existingOrder.status} to ${body.status}` 
-        }, { status: 400 })
+        if (!validTransitions[existingOrder.status]?.includes(body.status)) {
+          return NextResponse.json({ 
+            error: `Cannot transition from ${existingOrder.status} to ${body.status}` 
+          }, { status: 400 })
+        }
       }
     }
 
