@@ -249,12 +249,8 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
       }
       
       // Vendor Contact info
-      if (vendor.vendor_email) {
-        pdf.text(`Email: ${vendor.vendor_email}`, 110, yPos)
-        yPos += 6
-      }
-      if (vendor.vendor_phone) {
-        pdf.text(`Phone: ${vendor.vendor_phone}`, 110, yPos)
+      if (vendor.email) {
+        pdf.text(`Email: ${vendor.email}`, 110, yPos)
         yPos += 6
       }
       if (vendor.contact_person) {

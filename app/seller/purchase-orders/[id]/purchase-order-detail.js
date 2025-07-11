@@ -249,12 +249,8 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
       }
       
       // Vendor Contact info
-      if (supplier.vendor_email || supplier.email) {
-        pdf.text(`Email: ${supplier.vendor_email || supplier.email}`, 110, yPos)
-        yPos += 6
-      }
-      if (supplier.vendor_phone) {
-        pdf.text(`Phone: ${supplier.vendor_phone}`, 110, yPos)
+      if (supplier.email) {
+        pdf.text(`Email: ${supplier.email}`, 110, yPos)
         yPos += 6
       }
       if (supplier.contact_person || supplier.contact_name) {
@@ -433,7 +429,6 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
                       <th className="text-left py-3 px-2">SKU</th>
                       <th className="text-left py-3 px-2">Product</th>
                       <th className="text-right py-3 px-2">Quantity</th>
-                      <th className="text-left py-3 px-2">UOM</th>
                       <th className="text-right py-3 px-2">Unit Price</th>
                       <th className="text-right py-3 px-2">Total</th>
                     </tr>
@@ -451,7 +446,6 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
                           </div>
                         </td>
                         <td className="py-3 px-2 text-right">{item.quantity}</td>
-                        <td className="py-3 px-2">{item.product?.unit_of_measure || 'units'}</td>
                         <td className="py-3 px-2 text-right">{formatCurrency(item.unit_price)}</td>
                         <td className="py-3 px-2 text-right font-medium">
                           {formatCurrency(item.quantity * item.unit_price)}
@@ -461,13 +455,13 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan="5" className="py-3 px-2 text-right font-medium">Subtotal:</td>
+                      <td colSpan="4" className="py-3 px-2 text-right font-medium">Subtotal:</td>
                       <td className="py-3 px-2 text-right font-medium">
                         {formatCurrency(order.subtotal || 0)}
                       </td>
                     </tr>
                     <tr className="border-t-2">
-                      <td colSpan="5" className="py-3 px-2 text-right font-bold text-lg">Total:</td>
+                      <td colSpan="4" className="py-3 px-2 text-right font-bold text-lg">Total:</td>
                       <td className="py-3 px-2 text-right font-bold text-lg">
                         {formatCurrency(order.total_amount || 0)}
                       </td>
@@ -597,22 +591,16 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
                 <p className="text-sm text-gray-500">Name</p>
                 <p className="font-medium">{order.supplier?.vendor_name || 'Unknown Supplier'}</p>
               </div>
-              {order.supplier?.vendor_email && (
+              {order.supplier?.email && (
                 <div>
                   <p className="text-sm text-gray-500">Email</p>
-                  <p className="font-medium">{order.supplier.vendor_email}</p>
+                  <p className="font-medium">{order.supplier.email}</p>
                 </div>
               )}
               {order.supplier?.contact_name && (
                 <div>
                   <p className="text-sm text-gray-500">Contact Person</p>
                   <p className="font-medium">{order.supplier.contact_name}</p>
-                </div>
-              )}
-              {order.supplier?.vendor_phone && (
-                <div>
-                  <p className="text-sm text-gray-500">Phone</p>
-                  <p className="font-medium">{order.supplier.vendor_phone}</p>
                 </div>
               )}
               {order.supplier?.address && (

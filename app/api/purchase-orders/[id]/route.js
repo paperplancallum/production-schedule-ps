@@ -38,8 +38,6 @@ export async function GET(request, { params }) {
           id,
           vendor_code,
           vendor_name,
-          vendor_email,
-          vendor_phone,
           email,
           address,
           contact_name,
@@ -215,15 +213,7 @@ export async function PATCH(request, { params }) {
       .from('purchase_orders')
       .update(body)
       .eq('id', id)
-      .select(`
-        *,
-        supplier:vendors!supplier_id(
-          id,
-          vendor_code,
-          vendor_name,
-          email
-        )
-      `)
+      .select('*')
       .single()
 
     if (error) {
@@ -380,6 +370,7 @@ export async function PATCH(request, { params }) {
     }
     
     // For seller updates, use the existing logic
+    console.log('Fetching complete order for seller update')
     const { data: completeOrder, error: fetchCompleteError } = await supabase
       .from('purchase_orders')
       .select(`
@@ -405,8 +396,6 @@ export async function PATCH(request, { params }) {
           id,
           vendor_code,
           vendor_name,
-          vendor_email,
-          vendor_phone,
           email,
           address,
           contact_name,
@@ -429,8 +418,7 @@ export async function PATCH(request, { params }) {
             id,
             product_name,
             sku,
-            description,
-            unit_of_measure
+            description
           ),
           product_supplier:product_suppliers(
             id,
@@ -457,6 +445,7 @@ export async function PATCH(request, { params }) {
 
     if (fetchCompleteError) {
       console.error('Error fetching complete order:', fetchCompleteError)
+      console.error('Query error details:', fetchCompleteError.message)
       // Return the basic update data if we can't fetch the complete order
       return NextResponse.json(data)
     }
@@ -599,8 +588,6 @@ export async function PUT(request, { params }) {
           id,
           vendor_code,
           vendor_name,
-          vendor_email,
-          vendor_phone,
           email,
           address,
           contact_name,
