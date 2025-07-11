@@ -56,6 +56,11 @@ export default function SettingsPage() {
           .eq('id', user.id)
           .single()
         
+        if (sellerError && sellerError.code !== 'PGRST116') {
+          // Only log error if it's not a "not found" error
+          console.error('Error fetching seller data:', sellerError)
+        }
+        
         if (sellerData) {
           // Set user info
           setUserInfo(prev => ({
@@ -95,21 +100,52 @@ export default function SettingsPage() {
       if (userError) throw userError
       
       if (user) {
-        const { error } = await supabase
+        // First check if seller record exists
+        const { data: existingSeller, error: checkError } = await supabase
           .from('sellers')
-          .update({
-            full_name: userInfo.full_name,
-            updated_at: new Date().toISOString()
-          })
+          .select('id')
           .eq('id', user.id)
+          .single()
         
-        if (error) throw error
+        if (checkError && checkError.code === 'PGRST116') {
+          // No seller record exists, create one
+          const { error: insertError } = await supabase
+            .from('sellers')
+            .insert({
+              id: user.id,
+              full_name: userInfo.full_name,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+          
+          if (insertError) {
+            console.error('Insert error:', insertError)
+            throw insertError
+          }
+        } else {
+          // Update existing record
+          const { data, error } = await supabase
+            .from('sellers')
+            .update({
+              full_name: userInfo.full_name,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', user.id)
+            .select()
+          
+          if (error) {
+            console.error('Update error:', error)
+            throw error
+          }
+          
+          console.log('Update result:', data)
+        }
         
         toast.success('User information saved successfully')
       }
     } catch (error) {
       console.error('Error saving user info:', error)
-      toast.error('Failed to save user information')
+      toast.error('Failed to save user information: ' + (error.message || 'Unknown error'))
     } finally {
       setSaving(false)
     }
@@ -123,21 +159,52 @@ export default function SettingsPage() {
       if (userError) throw userError
       
       if (user) {
-        const { error } = await supabase
+        // First check if seller record exists
+        const { data: existingSeller, error: checkError } = await supabase
           .from('sellers')
-          .update({
-            ...businessInfo,
-            updated_at: new Date().toISOString()
-          })
+          .select('id')
           .eq('id', user.id)
+          .single()
         
-        if (error) throw error
+        if (checkError && checkError.code === 'PGRST116') {
+          // No seller record exists, create one
+          const { error: insertError } = await supabase
+            .from('sellers')
+            .insert({
+              id: user.id,
+              ...businessInfo,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+          
+          if (insertError) {
+            console.error('Insert error:', insertError)
+            throw insertError
+          }
+        } else {
+          // Update existing record
+          const { data, error } = await supabase
+            .from('sellers')
+            .update({
+              ...businessInfo,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', user.id)
+            .select()
+          
+          if (error) {
+            console.error('Update error:', error)
+            throw error
+          }
+          
+          console.log('Update result:', data)
+        }
         
         toast.success('Business information saved successfully')
       }
     } catch (error) {
       console.error('Error saving business info:', error)
-      toast.error('Failed to save business information')
+      toast.error('Failed to save business information: ' + (error.message || 'Unknown error'))
     } finally {
       setSaving(false)
     }

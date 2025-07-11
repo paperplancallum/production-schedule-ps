@@ -166,6 +166,12 @@ export async function PATCH(request, { params }) {
 
     if (error) {
       console.error('Error updating purchase order:', error)
+      // Check if it's a column not found error
+      if (error.message.includes('goods_ready_date') && error.message.includes('column')) {
+        return NextResponse.json({ 
+          error: 'Database migration required. Please run the migration to add the goods_ready_date column. Check MIGRATION_INSTRUCTIONS.md for details.' 
+        }, { status: 400 })
+      }
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
