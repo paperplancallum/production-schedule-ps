@@ -151,13 +151,13 @@ export async function PATCH(request, { params }) {
     }
 
     // Check if user has permission to update this order
-    const { data: existingOrder, error: fetchError } = await supabase
+    const { data: existingOrder, error: existingOrderError } = await supabase
       .from('purchase_orders')
       .select('id, seller_id, supplier_id, status, goods_ready_date')
       .eq('id', id)
       .single()
 
-    if (fetchError || !existingOrder) {
+    if (existingOrderError || !existingOrder) {
       return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
     }
 

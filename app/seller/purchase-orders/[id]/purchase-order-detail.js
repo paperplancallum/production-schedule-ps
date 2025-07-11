@@ -37,6 +37,10 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
   const [order, setOrder] = useState(initialOrder)
   const [loading, setLoading] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  
+  // Debug logging
+  console.log('Order data:', initialOrder)
+  console.log('Supplier data:', initialOrder?.supplier)
 
   const statusConfig = {
     draft: { label: 'Draft', color: 'secondary', icon: FileText },
@@ -584,7 +588,7 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
             <CardContent className="space-y-3">
               <div>
                 <p className="text-sm text-gray-500">Name</p>
-                <p className="font-medium">{order.supplier?.vendor_name || 'N/A'}</p>
+                <p className="font-medium">{order.supplier?.vendor_name || 'Unknown Supplier'}</p>
               </div>
               {order.supplier?.vendor_email && (
                 <div>
