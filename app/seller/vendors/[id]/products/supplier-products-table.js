@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search, Plus } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
 
 export default function SupplierProductsTable({ products, vendorId }) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -28,6 +29,13 @@ export default function SupplierProductsTable({ products, vendorId }) {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <Link
+            href={`/seller/vendors/${vendorId}/products/assign`}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Assign Products
+          </Link>
         </div>
       </div>
 

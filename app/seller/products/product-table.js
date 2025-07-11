@@ -179,6 +179,8 @@ function ProductSuppliers({ productId, productName }) {
         // We'll use the first tier's values for backward compatibility
         minimum_order_quantity: parseInt(validTiers[0].minimum_order_quantity),
         unit_price: parseFloat(validTiers[0].unit_price),
+        // If no suppliers exist, make this one primary
+        is_primary: suppliers.length === 0,
       }
 
       const { data: supplierResult, error: supplierError } = await supabase
@@ -342,6 +344,43 @@ function ProductSuppliers({ productId, productName }) {
     }
   }
 
+  const handleMakePrimary = async (supplierId) => {
+    try {
+      // Update this supplier to be primary
+      const { error } = await supabase
+        .from('product_suppliers')
+        .update({ is_primary: true })
+        .eq('id', supplierId)
+
+      if (error) throw error
+
+      // Get the default tier price to update product
+      const supplier = suppliers.find(s => s.id === supplierId)
+      const defaultTier = supplier?.supplier_price_tiers?.find(t => t.is_default)
+      
+      if (defaultTier) {
+        // Update product price
+        const { error: productError } = await supabase
+          .from('products')
+          .update({ price: defaultTier.unit_price })
+          .eq('id', productId)
+        
+        if (productError) {
+          console.error('Error updating product price:', productError)
+        } else {
+          toast.success('Primary supplier set and product price updated')
+        }
+      } else {
+        toast.success('Primary supplier set')
+      }
+
+      fetchSuppliers()
+    } catch (error) {
+      console.error('Error setting primary supplier:', error)
+      toast.error('Failed to set primary supplier')
+    }
+  }
+
   const handleDeleteSupplier = async (supplierId) => {
     if (!confirm('Are you sure you want to remove this supplier?')) return
 
@@ -412,7 +451,25 @@ function ProductSuppliers({ productId, productName }) {
                         )}
                       </Button>
                     </td>
-                    <td className="p-2 text-slate-900">{supplier.vendors?.vendor_name || 'Unknown'}</td>
+                    <td className="p-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-900">{supplier.vendors?.vendor_name || 'Unknown'}</span>
+                        {supplier.is_primary ? (
+                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                            Primary
+                          </span>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleMakePrimary(supplier.id)}
+                            className="h-6 px-2 text-xs hover:bg-slate-100"
+                          >
+                            Make Primary
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                     <td className="p-2 text-slate-600">{supplier.lead_time_days} days</td>
                     <td className="p-2 text-slate-600">
                       {supplier.supplier_price_tiers?.length || 0} tier(s)
@@ -679,7 +736,7 @@ const columns = [
       const price = row.getValue('price')
       return (
         <div className="font-medium">
-          {price ? `$${parseFloat(price).toFixed(2)}` : 'Calculated'}
+          {price ? `$${parseFloat(price).toFixed(2)}` : 'Set Primary Supplier'}
         </div>
       )
     },
@@ -1004,7 +1061,7 @@ export function ProductTable() {
                       disabled
                       className="bg-gray-100"
                     />
-                    <p className="text-xs text-muted-foreground">Price will be calculated automatically</p>
+                    <p className="text-xs text-muted-foreground">Price comes from primary supplier's default tier</p>
                   </div>
                 </div>
                 <div className="px-6 py-4 border-t">
@@ -1077,7 +1134,7 @@ export function ProductTable() {
                   disabled
                   className="bg-gray-100"
                 />
-                <p className="text-xs text-muted-foreground">Price will be calculated automatically</p>
+                <p className="text-xs text-muted-foreground">Price comes from primary supplier's default tier</p>
               </div>
             </div>
             <div className="px-6 py-4 border-t">

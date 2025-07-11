@@ -30,7 +30,7 @@ This is a Next.js application for managing production schedules, vendors, and pr
 - **Simplified Product Fields**:
   - Product Name
   - Internal SKU (unique per seller)
-  - Price (disabled, will be calculated by future function)
+  - Price (auto-calculated from primary supplier's default tier)
 - **Features**:
   - CRUD operations for products
   - Duplicate SKU validation with inline form errors
@@ -38,6 +38,11 @@ This is a Next.js application for managing production schedules, vendors, and pr
 
 ### 4. Product Suppliers
 - Each product can have multiple suppliers (vendors of type "supplier")
+- **Primary Supplier**:
+  - One supplier marked as primary per product
+  - Primary supplier's default tier sets product price
+  - "Make Primary" button for non-primary suppliers
+  - First supplier automatically becomes primary
 - **Supplier Fields**:
   - Lead Time (days)
   - Tiered Pricing (multiple price breaks based on MOQ)
@@ -102,6 +107,7 @@ All tables use RLS policies to ensure:
 - Added tiered pricing for suppliers with MOQ-based price breaks
 - Added edit functionality for suppliers (lead time & price tiers)
 - Added default tier selection with star icon
+- Added primary supplier feature (cascades default price to product)
 
 ### 2025-01-10
 - Initial products implementation

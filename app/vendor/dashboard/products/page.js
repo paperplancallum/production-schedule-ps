@@ -23,8 +23,8 @@ export default async function VendorProductsPage() {
     redirect('/vendor/dashboard')
   }
 
-  // Fetch products that this supplier provides
-  const { data: products, error } = await supabase
+  // First try to fetch with product_suppliers join
+  let { data: products, error } = await supabase
     .from('products')
     .select(`
       *,
@@ -38,6 +38,19 @@ export default async function VendorProductsPage() {
     .eq('seller_id', vendor.seller_id)
     .eq('product_suppliers.supplier_id', vendor.id)
     .order('created_at', { ascending: false })
+
+  // If product_suppliers table doesn't exist, fetch products without join
+  if (error && error.message?.includes('product_suppliers')) {
+    console.log('product_suppliers table not found, fetching products without supplier info')
+    const result = await supabase
+      .from('products')
+      .select('*')
+      .eq('seller_id', vendor.seller_id)
+      .order('created_at', { ascending: false })
+    
+    products = result.data
+    error = result.error
+  }
 
   if (error) {
     console.error('Error fetching products:', error)
@@ -64,6 +77,15 @@ export default async function VendorProductsPage() {
             Products you supply to your seller
           </p>
         </div>
+        
+        {error && error.message?.includes('product_suppliers') && (
+          <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              The product suppliers relationship table is not set up yet. 
+              Showing all products for now.
+            </p>
+          </div>
+        )}
         
         <VendorProductsTable 
           products={products || []} 
