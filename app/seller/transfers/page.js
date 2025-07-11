@@ -80,6 +80,8 @@ export default function TransfersPage() {
     loadTransfers()
   }, [statusFilter])
 
+  const [isCreatingTransfer, setIsCreatingTransfer] = useState(false)
+
   useEffect(() => {
     // Check for transfer creation from PO
     const createTransfer = searchParams.get('create')
@@ -87,10 +89,21 @@ export default function TransfersPage() {
     const poNumber = searchParams.get('po')
     const isInstant = searchParams.get('instant') === 'true'
 
-    if (createTransfer === 'true' && transferType && poNumber) {
+    if (createTransfer === 'true' && transferType && poNumber && !isCreatingTransfer) {
+      // Clear URL parameters immediately to prevent double execution
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('create')
+      newUrl.searchParams.delete('type')
+      newUrl.searchParams.delete('po')
+      newUrl.searchParams.delete('instant')
+      window.history.replaceState({}, '', newUrl)
+      
       if (isInstant) {
         // For instant transfers, create it immediately
-        createInstantTransfer(poNumber)
+        setIsCreatingTransfer(true)
+        createInstantTransfer(poNumber).finally(() => {
+          setIsCreatingTransfer(false)
+        })
       } else {
         // Set transfer type
         setFormData(prev => ({
@@ -110,16 +123,8 @@ export default function TransfersPage() {
         // Load PO data to get items
         loadPurchaseOrderData(poNumber)
       }
-      
-      // Clear URL parameters
-      const newUrl = new URL(window.location.href)
-      newUrl.searchParams.delete('create')
-      newUrl.searchParams.delete('type')
-      newUrl.searchParams.delete('po')
-      newUrl.searchParams.delete('instant')
-      window.history.replaceState({}, '', newUrl)
     }
-  }, [searchParams])
+  }, [searchParams, isCreatingTransfer])
 
   const loadTransfers = async () => {
     setLoading(true)
@@ -130,9 +135,10 @@ export default function TransfersPage() {
         throw new Error('User not authenticated')
       }
 
-      // For now, we'll simulate transfers data
-      // In a real implementation, this would fetch from a transfers table
-      const mockTransfers = []
+      // Load transfers from localStorage for persistence
+      // In a real implementation, this would fetch from a database
+      const storedTransfers = localStorage.getItem('transfers')
+      const mockTransfers = storedTransfers ? JSON.parse(storedTransfers) : []
 
       const filteredTransfers = statusFilter === 'all' 
         ? mockTransfers 
@@ -241,8 +247,7 @@ export default function TransfersPage() {
         `Inventory received successfully! Transfer ${transferNumber} created with ${transferData.items.length} items (${totalQuantity} units) at ${transferData.to_location}.`
       )
       
-      // Add the new transfer to the mock list temporarily
-      // In a real implementation, this would reload from the database
+      // Create the new transfer
       const newTransfer = {
         id: Date.now().toString(),
         ...transferData,
@@ -252,11 +257,14 @@ export default function TransfersPage() {
         carrier: 'Internal Transfer'
       }
       
-      setTransfers(prev => [newTransfer, ...prev])
+      // Save to localStorage for persistence
+      const storedTransfers = localStorage.getItem('transfers')
+      const existingTransfers = storedTransfers ? JSON.parse(storedTransfers) : []
+      const updatedTransfers = [newTransfer, ...existingTransfers]
+      localStorage.setItem('transfers', JSON.stringify(updatedTransfers))
       
-      // Recalculate stats
-      const updatedTransfers = [newTransfer, ...transfers]
-      calculateStats(updatedTransfers)
+      // Reload transfers to update the UI
+      loadTransfers()
     } catch (error) {
       console.error('Error creating instant transfer:', error)
       toast.error('Failed to receive inventory')
@@ -304,8 +312,31 @@ export default function TransfersPage() {
       // Generate transfer number
       const transferNumber = `TRF-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
       
-      // In a real implementation, this would save to the database with formData
-      // For now, show success with details
+      // Create the new transfer
+      const newTransfer = {
+        id: Date.now().toString(),
+        transfer_number: transferNumber,
+        transfer_type: formData.transfer_type,
+        purchase_order_number: formData.purchase_order_id,
+        from_location: formData.from_location,
+        from_location_type: formData.from_location_type,
+        to_location: formData.to_location,
+        to_location_type: formData.to_location_type,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        estimated_arrival: formData.estimated_arrival,
+        tracking_number: formData.tracking_number,
+        carrier: formData.carrier,
+        notes: formData.notes,
+        items: formData.items || []
+      }
+      
+      // Save to localStorage for persistence
+      const storedTransfers = localStorage.getItem('transfers')
+      const existingTransfers = storedTransfers ? JSON.parse(storedTransfers) : []
+      const updatedTransfers = [newTransfer, ...existingTransfers]
+      localStorage.setItem('transfers', JSON.stringify(updatedTransfers))
+      
       const itemCount = formData.items?.length || 0
       const totalQuantity = formData.items?.reduce((sum, item) => sum + item.quantity, 0) || 0
       
