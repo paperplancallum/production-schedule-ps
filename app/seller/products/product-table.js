@@ -23,10 +23,280 @@ import {
 } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2 } from 'lucide-react'
+import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 
+// Component for the expanded row content
+function ProductSuppliers({ productId, productName }) {
+  const [suppliers, setSuppliers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [isAddingSupplier, setIsAddingSupplier] = useState(false)
+  const [newSupplier, setNewSupplier] = useState({
+    vendor_id: '',
+    lead_time_days: '',
+    minimum_order_quantity: '',
+    unit_price: '',
+  })
+  const [vendors, setVendors] = useState([])
+  const supabase = createClient()
+
+  useEffect(() => {
+    fetchSuppliers()
+    fetchVendors()
+  }, [productId])
+
+  const fetchSuppliers = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('product_suppliers')
+        .select(`
+          *,
+          vendors (
+            id,
+            vendor_name,
+            vendor_type
+          )
+        `)
+        .eq('product_id', productId)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching suppliers:', error)
+        setSuppliers([])
+        return
+      }
+
+      setSuppliers(data || [])
+    } catch (error) {
+      console.error('Error fetching suppliers:', error)
+      setSuppliers([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchVendors = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData.user) return
+
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('id, vendor_name, vendor_type')
+        .eq('seller_id', userData.user.id)
+        .eq('status', 'accepted')
+        .order('vendor_name')
+
+      if (!error && data) {
+        setVendors(data)
+      }
+    } catch (error) {
+      console.error('Error fetching vendors:', error)
+    }
+  }
+
+  const handleAddSupplier = async (e) => {
+    e.preventDefault()
+    
+    try {
+      const supplierData = {
+        product_id: productId,
+        vendor_id: newSupplier.vendor_id,
+        lead_time_days: parseInt(newSupplier.lead_time_days),
+        minimum_order_quantity: parseInt(newSupplier.minimum_order_quantity),
+        unit_price: parseFloat(newSupplier.unit_price),
+      }
+
+      const { error } = await supabase
+        .from('product_suppliers')
+        .insert([supplierData])
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.error('This vendor is already a supplier for this product')
+          return
+        }
+        throw error
+      }
+
+      toast.success('Supplier added successfully')
+      setIsAddingSupplier(false)
+      setNewSupplier({
+        vendor_id: '',
+        lead_time_days: '',
+        minimum_order_quantity: '',
+        unit_price: '',
+      })
+      fetchSuppliers()
+    } catch (error) {
+      console.error('Error adding supplier:', error)
+      toast.error('Failed to add supplier')
+    }
+  }
+
+  const handleDeleteSupplier = async (supplierId) => {
+    if (!confirm('Are you sure you want to remove this supplier?')) return
+
+    try {
+      const { error } = await supabase
+        .from('product_suppliers')
+        .delete()
+        .eq('id', supplierId)
+
+      if (error) throw error
+
+      toast.success('Supplier removed successfully')
+      fetchSuppliers()
+    } catch (error) {
+      console.error('Error deleting supplier:', error)
+      toast.error('Failed to remove supplier')
+    }
+  }
+
+  return (
+    <div className="px-8 py-4 bg-slate-50">
+      <div className="flex justify-between items-center mb-4">
+        <h4 className="text-sm font-medium text-slate-900">Suppliers for {productName}</h4>
+        <Button
+          size="sm"
+          onClick={() => setIsAddingSupplier(true)}
+        >
+          <Plus className="mr-2 h-3 w-3" />
+          Add Supplier
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center p-4">
+          <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />
+        </div>
+      ) : suppliers.length === 0 ? (
+        <div className="text-center py-8 text-sm text-slate-500">
+          No suppliers added yet
+        </div>
+      ) : (
+        <div className="rounded-md border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-white">
+                <th className="text-left p-2">Vendor Name</th>
+                <th className="text-left p-2">Lead Time (days)</th>
+                <th className="text-left p-2">Min Order Qty</th>
+                <th className="text-left p-2">Unit Price</th>
+                <th className="text-left p-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {suppliers.map((supplier) => (
+                <tr key={supplier.id} className="border-b bg-white">
+                  <td className="p-2">{supplier.vendors?.vendor_name || 'Unknown'}</td>
+                  <td className="p-2">{supplier.lead_time_days} days</td>
+                  <td className="p-2">{supplier.minimum_order_quantity}</td>
+                  <td className="p-2">${parseFloat(supplier.unit_price).toFixed(2)}</td>
+                  <td className="p-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => handleDeleteSupplier(supplier.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Sheet open={isAddingSupplier} onOpenChange={setIsAddingSupplier}>
+        <SheetContent className="w-[400px] sm:w-[540px]">
+          <SheetHeader>
+            <SheetTitle>Add Supplier</SheetTitle>
+            <SheetDescription>
+              Add a supplier for {productName}
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleAddSupplier} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="vendor">Vendor *</Label>
+              <select
+                id="vendor"
+                className="w-full rounded-md border border-input bg-background px-3 py-2"
+                value={newSupplier.vendor_id}
+                onChange={(e) => setNewSupplier({ ...newSupplier, vendor_id: e.target.value })}
+                required
+              >
+                <option value="">Select a vendor</option>
+                {vendors.map((vendor) => (
+                  <option key={vendor.id} value={vendor.id}>
+                    {vendor.vendor_name} ({vendor.vendor_type.replace('_', ' ')})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lead_time">Lead Time (days) *</Label>
+              <Input
+                id="lead_time"
+                type="number"
+                value={newSupplier.lead_time_days}
+                onChange={(e) => setNewSupplier({ ...newSupplier, lead_time_days: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="min_order">Minimum Order Quantity *</Label>
+              <Input
+                id="min_order"
+                type="number"
+                value={newSupplier.minimum_order_quantity}
+                onChange={(e) => setNewSupplier({ ...newSupplier, minimum_order_quantity: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="unit_price">Unit Price *</Label>
+              <Input
+                id="unit_price"
+                type="number"
+                step="0.01"
+                value={newSupplier.unit_price}
+                onChange={(e) => setNewSupplier({ ...newSupplier, unit_price: e.target.value })}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full">
+              Add Supplier
+            </Button>
+          </form>
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
+
 const columns = [
+  {
+    id: 'expander',
+    header: () => null,
+    cell: ({ row }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => row.toggleExpanded()}
+          className="h-8 w-8 p-0"
+        >
+          {row.getIsExpanded() ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </Button>
+      )
+    },
+  },
   {
     accessorKey: 'product_name',
     header: ({ column }) => (
@@ -485,6 +755,12 @@ export function ProductTable() {
           columns={columns}
           data={products}
           searchKey="product_name"
+          renderSubComponent={({ row }) => (
+            <ProductSuppliers
+              productId={row.original.id}
+              productName={row.original.product_name}
+            />
+          )}
           meta={{
             onEditProduct: openEditSheet,
             onDeleteProduct: handleDeleteProduct,
