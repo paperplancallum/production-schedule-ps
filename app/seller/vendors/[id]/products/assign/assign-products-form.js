@@ -69,16 +69,20 @@ export default function AssignProductsForm({ vendorId, vendorName, products, ass
         const assignments = Array.from(selectedProducts).map(productId => ({
           product_id: productId,
           vendor_id: vendorId,
-          unit_price: supplierInfo[productId]?.price_per_unit || products.find(p => p.id === productId)?.price || 0,
-          minimum_order_quantity: supplierInfo[productId]?.moq || 1,
           lead_time_days: supplierInfo[productId]?.lead_time_days || 7,
+          moq: supplierInfo[productId]?.moq || 1,
           is_primary: false
         }))
 
-        const { error: insertError } = await supabase
+        console.log('Inserting assignments:', assignments)
+        
+        const { data: insertedData, error: insertError } = await supabase
           .from('product_suppliers')
           .insert(assignments)
+          .select()
 
+        console.log('Insert result:', { insertedData, insertError })
+        
         if (insertError) throw insertError
       }
 
