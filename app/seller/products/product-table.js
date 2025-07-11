@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2, ChevronDown, ChevronRight, Star, FileText } from 'lucide-react'
+import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2, ChevronDown, ChevronRight, Star, FileText, Filter } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Select,
