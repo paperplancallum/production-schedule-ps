@@ -129,23 +129,21 @@ export default function TransfersPage() {
   const loadTransfers = async () => {
     setLoading(true)
     try {
-      const { data: userData } = await supabase.auth.getUser()
-      
-      if (!userData.user) {
-        throw new Error('User not authenticated')
+      const params = new URLSearchParams()
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter)
       }
 
-      // Load transfers from localStorage for persistence
-      // In a real implementation, this would fetch from a database
-      const storedTransfers = localStorage.getItem('transfers')
-      const mockTransfers = storedTransfers ? JSON.parse(storedTransfers) : []
+      const response = await fetch(`/api/transfers?${params}`)
+      const data = await response.json()
 
-      const filteredTransfers = statusFilter === 'all' 
-        ? mockTransfers 
-        : mockTransfers.filter(t => t.status === statusFilter)
-
-      setTransfers(filteredTransfers)
-      calculateStats(mockTransfers)
+      if (response.ok) {
+        setTransfers(data)
+        calculateStats(data)
+      } else {
+        console.error('Error loading transfers:', data.error)
+        toast.error('Failed to load transfers')
+      }
     } catch (error) {
       console.error('Error loading transfers:', error)
       toast.error('Failed to load transfers')
@@ -223,7 +221,7 @@ export default function TransfersPage() {
       const transferData = {
         transfer_number: transferNumber,
         transfer_type: 'in',
-        purchase_order_id: poNumber,
+        purchase_order_id: poData.id, // Use the actual PO ID, not the number
         purchase_order_number: poNumber,
         from_location: poData.supplier?.vendor_name || 'Supplier',
         from_location_type: 'supplier',
@@ -247,21 +245,21 @@ export default function TransfersPage() {
         `Inventory received successfully! Transfer ${transferNumber} created with ${transferData.items.length} items (${totalQuantity} units) at ${transferData.to_location}.`
       )
       
-      // Create the new transfer
-      const newTransfer = {
-        id: Date.now().toString(),
-        ...transferData,
-        created_at: new Date().toISOString(),
-        estimated_arrival: new Date().toISOString(),
-        tracking_number: '',
-        carrier: 'Internal Transfer'
+      // Save to database
+      const response = await fetch('/api/transfers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transferData)
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create transfer')
       }
-      
-      // Save to localStorage for persistence
-      const storedTransfers = localStorage.getItem('transfers')
-      const existingTransfers = storedTransfers ? JSON.parse(storedTransfers) : []
-      const updatedTransfers = [newTransfer, ...existingTransfers]
-      localStorage.setItem('transfers', JSON.stringify(updatedTransfers))
+
+      const createdTransfer = await response.json()
       
       // Reload transfers to update the UI
       loadTransfers()
@@ -314,7 +312,6 @@ export default function TransfersPage() {
       
       // Create the new transfer
       const newTransfer = {
-        id: Date.now().toString(),
         transfer_number: transferNumber,
         transfer_type: formData.transfer_type,
         purchase_order_number: formData.purchase_order_id,
@@ -323,19 +320,28 @@ export default function TransfersPage() {
         to_location: formData.to_location,
         to_location_type: formData.to_location_type,
         status: 'pending',
-        created_at: new Date().toISOString(),
-        estimated_arrival: formData.estimated_arrival,
-        tracking_number: formData.tracking_number,
-        carrier: formData.carrier,
-        notes: formData.notes,
+        estimated_arrival: formData.estimated_arrival ? new Date(formData.estimated_arrival).toISOString() : null,
+        tracking_number: formData.tracking_number || null,
+        carrier: formData.carrier || null,
+        notes: formData.notes || null,
         items: formData.items || []
       }
       
-      // Save to localStorage for persistence
-      const storedTransfers = localStorage.getItem('transfers')
-      const existingTransfers = storedTransfers ? JSON.parse(storedTransfers) : []
-      const updatedTransfers = [newTransfer, ...existingTransfers]
-      localStorage.setItem('transfers', JSON.stringify(updatedTransfers))
+      // Save to database
+      const response = await fetch('/api/transfers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTransfer)
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create transfer')
+      }
+
+      const createdTransfer = await response.json()
       
       const itemCount = formData.items?.length || 0
       const totalQuantity = formData.items?.reduce((sum, item) => sum + item.quantity, 0) || 0
