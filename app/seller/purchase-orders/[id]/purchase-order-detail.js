@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -20,7 +20,8 @@ import {
   Hash,
   Edit,
   Clock,
-  AlertCircle
+  AlertCircle,
+  ArrowDownToLine
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -37,6 +38,8 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
   const [order, setOrder] = useState(initialOrder)
   const [loading, setLoading] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [hasTransfer, setHasTransfer] = useState(false)
+  const [checkingTransfer, setCheckingTransfer] = useState(true)
 
   const statusConfig = {
     draft: { label: 'Draft', color: 'secondary', icon: FileText },
@@ -45,6 +48,26 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
     in_progress: { label: 'In Production', color: 'yellow', icon: Package },
     complete: { label: 'Complete', color: 'green', icon: CheckCircle },
     cancelled: { label: 'Cancelled', color: 'destructive', icon: XCircle }
+  }
+
+  useEffect(() => {
+    checkForTransfer()
+  }, [order.id])
+
+  const checkForTransfer = async () => {
+    try {
+      const response = await fetch('/api/transfers')
+      const data = await response.json()
+      
+      if (response.ok) {
+        const existingTransfer = data.find(t => t.purchase_order_id === order.id)
+        setHasTransfer(!!existingTransfer)
+      }
+    } catch (error) {
+      console.error('Error checking for transfer:', error)
+    } finally {
+      setCheckingTransfer(false)
+    }
   }
 
   const formatDate = (date) => {
@@ -354,6 +377,17 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
     await handleStatusUpdate('cancelled')
   }
 
+  const handleReceiveInventory = () => {
+    // Navigate to transfers page with this PO for instant transfer
+    router.push(`/seller/transfers?create=true&type=in&po=${encodeURIComponent(order.po_number)}&instant=true`)
+  }
+
+  const canReceiveInventory = () => {
+    // Can receive if: not already transferred, and status is approved, in_progress, or complete
+    return !hasTransfer && !checkingTransfer && 
+           (order.status === 'approved' || order.status === 'in_progress' || order.status === 'complete')
+  }
+
   const StatusIcon = statusConfig[order.status]?.icon || FileText
   const nextStatuses = getNextStatuses()
 
@@ -404,6 +438,22 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
+            {canReceiveInventory() && (
+              <Button 
+                onClick={handleReceiveInventory} 
+                disabled={loading}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <ArrowDownToLine className="h-4 w-4 mr-2" />
+                Receive into Inventory
+              </Button>
+            )}
+            {hasTransfer && (
+              <Badge variant="green" className="flex items-center gap-1 px-3 py-2">
+                <CheckCircle className="h-4 w-4" />
+                Inventory Received
+              </Badge>
+            )}
             {order.status === 'draft' && (
               <Button onClick={() => handleStatusUpdate('sent_to_supplier')} disabled={loading}>
                 <Mail className="h-4 w-4 mr-2" />
@@ -540,6 +590,28 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
               <CardTitle>Order Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Transfer Status */}
+              {(hasTransfer || canReceiveInventory()) && (
+                <div className="pb-4 border-b">
+                  <p className="text-sm text-gray-500 mb-2">Inventory Status</p>
+                  {hasTransfer ? (
+                    <Badge variant="green" className="flex items-center gap-1 w-full justify-center py-2">
+                      <CheckCircle className="h-4 w-4" />
+                      Transferred to Inventory
+                    </Badge>
+                  ) : canReceiveInventory() ? (
+                    <Button 
+                      onClick={handleReceiveInventory} 
+                      disabled={loading}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                      size="sm"
+                    >
+                      <ArrowDownToLine className="h-4 w-4 mr-2" />
+                      Receive into Inventory
+                    </Button>
+                  ) : null}
+                </div>
+              )}
               {nextStatuses.length > 0 && (
                 <div>
                   <Label>Update Status</Label>
