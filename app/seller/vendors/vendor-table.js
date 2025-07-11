@@ -269,7 +269,8 @@ export default function VendorTable({ initialVendors, currentUserId }) {
           .insert({
             ...vendorData,
             seller_id: currentUserId,
-            vendor_status: 'draft' // New vendors start as draft
+            // Warehouses are automatically accepted, others start as draft
+            vendor_status: vendorData.vendor_type === 'warehouse' ? 'accepted' : 'draft'
           })
           .select()
           .single()
@@ -300,9 +301,15 @@ export default function VendorTable({ initialVendors, currentUserId }) {
           description: `${data.vendor_name} has been updated.`
         })
       } else {
-        toast.success('Vendor added successfully!', {
-          description: `${data.vendor_name} has been added as a ${data.vendor_type.replace('_', ' ')}.`
-        })
+        if (data.vendor_type === 'warehouse') {
+          toast.success('Warehouse added successfully!', {
+            description: `${data.vendor_name} has been added and is ready to use.`
+          })
+        } else {
+          toast.success('Vendor added successfully!', {
+            description: `${data.vendor_name} has been added as a ${data.vendor_type.replace('_', ' ')}. You can now invite them to access the system.`
+          })
+        }
       }
       
       // Refresh the page to get updated data
