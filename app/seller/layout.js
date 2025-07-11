@@ -9,7 +9,9 @@ import {
   Settings, 
   Users,
   LogOut,
-  ClipboardCheck
+  ClipboardCheck,
+  Truck,
+  Warehouse
 } from 'lucide-react'
 
 export default async function SellerLayout({ children }) {
@@ -66,6 +68,16 @@ export default async function SellerLayout({ children }) {
       name: 'Inspections',
       href: '/seller/inspections',
       icon: ClipboardCheck
+    },
+    {
+      name: 'Transfers',
+      href: '/seller/transfers',
+      icon: Truck
+    },
+    {
+      name: 'Inventory',
+      href: '/seller/inventory',
+      icon: Warehouse
     },
     {
       name: 'Settings',
