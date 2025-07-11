@@ -74,8 +74,22 @@ export default function InspectionsPage() {
             supplier:vendors!supplier_id(
               id,
               vendor_name,
-              vendor_code,
+              email,
+              phone,
+              wechat,
+              address,
+              contact_name,
               country
+            ),
+            items:purchase_order_items(
+              id,
+              quantity,
+              product:products(
+                id,
+                sku,
+                product_name,
+                unit_of_measure
+              )
             )
           ),
           inspection_agent:vendors!inspection_agent_id(
@@ -89,13 +103,22 @@ export default function InspectionsPage() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('Error fetching inspections:', error)
+        console.error('Error fetching inspections:', error.message || 'Unknown error')
+        console.error('Error code:', error.code)
+        console.error('Full error:', JSON.stringify(error, null, 2))
+        
         // If table doesn't exist, just show empty state
         if (error.code === '42P01' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
           console.log('Inspections table not found, showing empty state')
           setInspections([])
           return
         }
+        
+        // If it's a column error, log it but continue
+        if (error.code === '42703' || error.message?.includes('column')) {
+          console.warn('Some columns may not exist in the database, continuing with partial data')
+        }
+        
         // For other errors, still show empty state but log the error
         setInspections([])
         return
@@ -235,22 +258,53 @@ export default function InspectionsPage() {
       doc.text(`${supplier.vendor_name} (${supplier.country || '-'})`, 30, yPos)
     })
     
-    // Add purchase orders
+    // Add purchase orders with items
     yPos += 20
-    doc.text('Purchase Orders:', 20, yPos)
+    doc.text('Purchase Orders & Items:', 20, yPos)
     const orders = inspection.purchase_orders?.length > 0 ? inspection.purchase_orders : [inspection.purchase_order]
     orders.forEach(po => {
       if (po) {
         yPos += 10
-        doc.text(`${po.po_number} - ${formatCurrency(po.total_amount)}`, 30, yPos)
+        doc.setFont(undefined, 'bold')
+        doc.text(`${po.po_number}:`, 30, yPos)
+        doc.setFont(undefined, 'normal')
+        
+        if (po.items && po.items.length > 0) {
+          po.items.forEach(item => {
+            yPos += 8
+            doc.text(`${item.product?.sku || 'SKU'} - ${item.product?.product_name || 'Unknown'}: ${item.quantity} ${item.product?.unit_of_measure || 'units'}`, 40, yPos)
+          })
+        }
       }
     })
     
-    // Add total
+    // Add SKU summary
     yPos += 15
-    const total = orders.reduce((sum, po) => sum + (po?.total_amount || 0), 0)
-    doc.setFontSize(14)
-    doc.text(`Total Amount: ${formatCurrency(total)}`, 20, yPos)
+    doc.setFontSize(12)
+    doc.setFont(undefined, 'bold')
+    doc.text('Total Items to Inspect:', 20, yPos)
+    doc.setFont(undefined, 'normal')
+    doc.setFontSize(10)
+    
+    const skuTotals = {}
+    orders.forEach(po => {
+      po?.items?.forEach(item => {
+        const sku = item.product?.sku || 'Unknown'
+        if (!skuTotals[sku]) {
+          skuTotals[sku] = {
+            name: item.product?.product_name || 'Unknown',
+            quantity: 0,
+            unit: item.product?.unit_of_measure || 'units'
+          }
+        }
+        skuTotals[sku].quantity += item.quantity
+      })
+    })
+    
+    Object.entries(skuTotals).forEach(([sku, data]) => {
+      yPos += 8
+      doc.text(`${sku} - ${data.name}: ${data.quantity} ${data.unit}`, 30, yPos)
+    })
     
     // Add notes if any
     if (inspection.notes) {
@@ -411,15 +465,6 @@ export default function InspectionsPage() {
                             <div className="mb-6 flex justify-between items-start">
                               <div>
                                 <h3 className="text-lg font-semibold mb-2">Inspection Schedule</h3>
-                                {inspection.inspection_numbers?.length > 1 && (
-                                  <div className="flex flex-wrap gap-2 mb-2">
-                                    {inspection.inspection_numbers.map((num, idx) => (
-                                      <Badge key={idx} variant="outline" className="text-xs">
-                                        {num}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                )}
                                 <div className="text-sm text-muted-foreground space-y-1">
                                   <div>Scheduled: {inspection.scheduled_date ? new Date(inspection.scheduled_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '-'}</div>
                                   <div>Status: <Badge variant={statusConfig[inspection.status]?.color} className="ml-1">
@@ -451,11 +496,42 @@ export default function InspectionsPage() {
                                 return suppliers.length > 0 ? (
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {suppliers.map((supplier, idx) => (
-                                      <div key={supplier?.id || idx}>
-                                        <div className="font-medium">{supplier?.vendor_name || '-'}</div>
-                                        <div className="text-sm text-muted-foreground">
-                                          {supplier?.vendor_code && <div>Code: {supplier.vendor_code}</div>}
-                                          {supplier?.country && <div>{supplier.country}</div>}
+                                      <div key={supplier?.id || idx} className="space-y-2">
+                                        <div className="font-medium text-base">{supplier?.vendor_name || '-'}</div>
+                                        <div className="text-sm text-muted-foreground space-y-1">
+                                          {supplier?.contact_name && (
+                                            <div className="flex items-start gap-2">
+                                              <span className="text-xs font-medium min-w-[80px]">Contact:</span>
+                                              <span>{supplier.contact_name}</span>
+                                            </div>
+                                          )}
+                                          {supplier?.email && (
+                                            <div className="flex items-start gap-2">
+                                              <span className="text-xs font-medium min-w-[80px]">Email:</span>
+                                              <span>{supplier.email}</span>
+                                            </div>
+                                          )}
+                                          {supplier?.phone && (
+                                            <div className="flex items-start gap-2">
+                                              <span className="text-xs font-medium min-w-[80px]">Phone:</span>
+                                              <span>{supplier.phone}</span>
+                                            </div>
+                                          )}
+                                          {supplier?.wechat && (
+                                            <div className="flex items-start gap-2">
+                                              <span className="text-xs font-medium min-w-[80px]">WeChat:</span>
+                                              <span>{supplier.wechat}</span>
+                                            </div>
+                                          )}
+                                          {supplier?.address && (
+                                            <div className="flex items-start gap-2">
+                                              <span className="text-xs font-medium min-w-[80px]">Address:</span>
+                                              <div>
+                                                <div>{supplier.address}</div>
+                                                {supplier.country && <div>{supplier.country}</div>}
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     ))}
@@ -474,7 +550,7 @@ export default function InspectionsPage() {
                                       <th className="text-left p-3 text-sm font-medium">PO Number</th>
                                       <th className="text-left p-3 text-sm font-medium">Order Date</th>
                                       <th className="text-left p-3 text-sm font-medium">Goods Ready</th>
-                                      <th className="text-right p-3 text-sm font-medium">Amount</th>
+                                      <th className="text-left p-3 text-sm font-medium">Items to Inspect</th>
                                       <th className="text-center p-3 text-sm font-medium">Action</th>
                                     </tr>
                                   </thead>
@@ -484,7 +560,19 @@ export default function InspectionsPage() {
                                         <td className="p-3 font-medium">{po?.po_number || '-'}</td>
                                         <td className="p-3 text-sm">{po?.order_date ? new Date(po.order_date).toLocaleDateString() : '-'}</td>
                                         <td className="p-3 text-sm">{po?.goods_ready_date ? new Date(po.goods_ready_date).toLocaleDateString() : '-'}</td>
-                                        <td className="p-3 text-right font-medium">{formatCurrency(po?.total_amount)}</td>
+                                        <td className="p-3 text-sm">
+                                          {po?.items && po.items.length > 0 ? (
+                                            <div className="space-y-1">
+                                              {po.items.map((item, itemIdx) => (
+                                                <div key={itemIdx} className="text-xs">
+                                                  <span className="font-medium">{item.product?.sku || 'SKU'}</span> - {item.product?.product_name || 'Unknown'}: {item.quantity} {item.product?.unit_of_measure || 'units'}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-muted-foreground">No items</span>
+                                          )}
+                                        </td>
                                         <td className="p-3 text-center">
                                           <Button
                                             variant="ghost"
@@ -499,16 +587,37 @@ export default function InspectionsPage() {
                                   </tbody>
                                   <tfoot className="bg-slate-50 dark:bg-slate-900 border-t">
                                     <tr>
-                                      <td colSpan={3} className="p-3 text-right font-medium">Total Amount:</td>
-                                      <td className="p-3 text-right font-bold text-lg">
-                                        {formatCurrency(
-                                          (inspection.purchase_orders?.length > 0 
-                                            ? inspection.purchase_orders 
-                                            : [inspection.purchase_order]
-                                          ).reduce((sum, po) => sum + (po?.total_amount || 0), 0)
-                                        )}
+                                      <td colSpan={3} className="p-3 text-right font-medium">Total Items to Inspect:</td>
+                                      <td className="p-3" colSpan={2}>
+                                        <div className="space-y-1">
+                                          {(() => {
+                                            const skuTotals = {};
+                                            const orders = inspection.purchase_orders?.length > 0 
+                                              ? inspection.purchase_orders 
+                                              : [inspection.purchase_order];
+                                            
+                                            orders.forEach(po => {
+                                              po?.items?.forEach(item => {
+                                                const sku = item.product?.sku || 'Unknown';
+                                                if (!skuTotals[sku]) {
+                                                  skuTotals[sku] = {
+                                                    name: item.product?.product_name || 'Unknown',
+                                                    quantity: 0,
+                                                    unit: item.product?.unit_of_measure || 'units'
+                                                  };
+                                                }
+                                                skuTotals[sku].quantity += item.quantity;
+                                              });
+                                            });
+                                            
+                                            return Object.entries(skuTotals).map(([sku, data]) => (
+                                              <div key={sku} className="text-sm">
+                                                <span className="font-medium">{sku}</span> - {data.name}: {data.quantity} {data.unit}
+                                              </div>
+                                            ));
+                                          })()}
+                                        </div>
                                       </td>
-                                      <td></td>
                                     </tr>
                                   </tfoot>
                                 </table>

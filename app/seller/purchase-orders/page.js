@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, Search, FileText, Package, Truck, CheckCircle, XCircle, Clock, ClipboardCheck } from 'lucide-react'
+import { Plus, Search, FileText, Package, Truck, CheckCircle, XCircle, Clock, ClipboardCheck, Eye } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import CreatePurchaseOrderDialog from './create-purchase-order-dialog'
 import ScheduleInspectionDialog from './schedule-inspection-dialog'
@@ -34,6 +34,7 @@ export default function PurchaseOrdersPage() {
   const [selectedOrders, setSelectedOrders] = useState([])
   const [inspectionDialogOpen, setInspectionDialogOpen] = useState(false)
   const [inspectionData, setInspectionData] = useState(null)
+  const [inspections, setInspections] = useState([])
   const [stats, setStats] = useState({
     total: 0,
     draft: 0,
@@ -43,6 +44,7 @@ export default function PurchaseOrdersPage() {
 
   useEffect(() => {
     loadPurchaseOrders()
+    loadInspections()
   }, [statusFilter])
 
   const loadPurchaseOrders = async () => {
@@ -71,6 +73,27 @@ export default function PurchaseOrdersPage() {
       console.error('Error loading purchase orders:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadInspections = async () => {
+    try {
+      const supabase = createClient()
+      const { data: userData } = await supabase.auth.getUser()
+      
+      if (!userData.user) return
+
+      const { data, error } = await supabase
+        .from('inspections')
+        .select('id, purchase_order_id, status, inspection_number')
+        .eq('seller_id', userData.user.id)
+        .not('status', 'in', '("cancelled","archived")')
+
+      if (!error && data) {
+        setInspections(data)
+      }
+    } catch (error) {
+      console.error('Error loading inspections:', error)
     }
   }
 
@@ -112,6 +135,13 @@ export default function PurchaseOrdersPage() {
     const order = orders.find(o => o.id === orderId)
     
     if (checked) {
+      // Check if order already has an inspection
+      const hasInspection = inspections.some(i => i.purchase_order_id === orderId)
+      if (hasInspection) {
+        toast.error('This order already has an inspection scheduled')
+        return
+      }
+      
       // Check if order status allows inspection
       if (order.status === 'draft') {
         toast.error('Draft orders cannot be scheduled for inspection')
@@ -143,9 +173,11 @@ export default function PurchaseOrdersPage() {
 
   const handleSelectAll = (checked) => {
     if (checked) {
-      // Filter out draft and cancelled orders
+      // Filter out draft, cancelled orders, and orders with inspections
       const selectableOrders = filteredOrders.filter(order => 
-        order.status !== 'draft' && order.status !== 'cancelled'
+        order.status !== 'draft' && 
+        order.status !== 'cancelled' &&
+        !inspections.some(i => i.purchase_order_id === order.id)
       )
       
       if (selectableOrders.length === 0) {
@@ -176,7 +208,8 @@ export default function PurchaseOrdersPage() {
         groups[supplierId] = {
           supplier: order.supplier,
           orders: [],
-          latestGoodsReadyDate: null
+          latestGoodsReadyDate: null,
+          skuSummary: {}
         }
       }
       groups[supplierId].orders.push(order)
@@ -186,6 +219,21 @@ export default function PurchaseOrdersPage() {
       if (orderDate && (!groups[supplierId].latestGoodsReadyDate || 
           new Date(orderDate) > new Date(groups[supplierId].latestGoodsReadyDate))) {
         groups[supplierId].latestGoodsReadyDate = orderDate
+      }
+      
+      // Aggregate SKU quantities
+      if (order.items && order.items.length > 0) {
+        order.items.forEach(item => {
+          const sku = item.product?.sku || 'Unknown'
+          if (!groups[supplierId].skuSummary[sku]) {
+            groups[supplierId].skuSummary[sku] = {
+              name: item.product?.product_name || 'Unknown Product',
+              quantity: 0,
+              unit: item.product?.unit_of_measure || 'units'
+            }
+          }
+          groups[supplierId].skuSummary[sku].quantity += item.quantity
+        })
       }
       
       return groups
@@ -308,18 +356,19 @@ export default function PurchaseOrdersPage() {
               <TableHead>Items</TableHead>
               <TableHead>Total</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Inspection</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   Loading purchase orders...
                 </TableCell>
               </TableRow>
             ) : filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   <div className="flex flex-col items-center">
                     <FileText className="h-12 w-12 text-gray-400 mb-2" />
                     <p className="text-gray-500">No purchase orders found</p>
@@ -339,12 +388,18 @@ export default function PurchaseOrdersPage() {
                 const StatusIcon = statusConfig[order.status]?.icon || FileText
                 const isSelected = selectedOrders.includes(order.id)
                 
+                // Check if order already has an active inspection
+                const orderInspection = inspections.find(i => i.purchase_order_id === order.id)
+                
                 // Determine if this order can be selected
                 let canSelect = true
                 let disabledReason = ''
                 
-                // Check if order status allows inspection
-                if (order.status === 'draft' || order.status === 'cancelled') {
+                // Check if already has inspection
+                if (orderInspection) {
+                  canSelect = false
+                  disabledReason = 'Already has inspection'
+                } else if (order.status === 'draft' || order.status === 'cancelled') {
                   canSelect = false
                   disabledReason = order.status === 'draft' ? 'Draft orders cannot be inspected' : 'Cancelled orders cannot be inspected'
                 } else if (selectedOrders.length > 0 && !isSelected) {
@@ -415,6 +470,18 @@ export default function PurchaseOrdersPage() {
                         {statusConfig[order.status]?.label}
                       </Badge>
                     </TableCell>
+                    <TableCell className="cursor-pointer" onClick={() => handleRowClick(order.id)}>
+                      {orderInspection ? (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            <Eye className="h-3 w-3 mr-1" />
+                            {orderInspection.inspection_number}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 )
               })
@@ -436,6 +503,7 @@ export default function PurchaseOrdersPage() {
         onSuccess={() => {
           setSelectedOrders([])
           loadPurchaseOrders()
+          loadInspections()
           toast.success('Inspection(s) scheduled successfully')
         }}
       />

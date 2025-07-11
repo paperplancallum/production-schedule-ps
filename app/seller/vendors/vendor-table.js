@@ -63,7 +63,9 @@ export default function VendorTable({ initialVendors, currentUserId }) {
     country: '',
     address: '',
     contactName: '',
-    vendorType: ''
+    vendorType: '',
+    phone: '',
+    wechat: ''
   })
 
   const handleInputChange = (e) => {
@@ -151,7 +153,9 @@ export default function VendorTable({ initialVendors, currentUserId }) {
       country: vendor.country || '',
       address: vendor.address || '',
       contactName: vendor.contact_name || '',
-      vendorType: vendor.vendor_type
+      vendorType: vendor.vendor_type,
+      phone: vendor.phone || '',
+      wechat: vendor.wechat || ''
     })
     setIsAddVendorOpen(true)
   }
@@ -239,6 +243,8 @@ export default function VendorTable({ initialVendors, currentUserId }) {
         country: newVendor.country,
         address: newVendor.address,
         contact_name: newVendor.contactName,
+        phone: newVendor.phone,
+        wechat: newVendor.wechat
       }
       
       // Only include vendor_type when creating new vendor
@@ -263,12 +269,18 @@ export default function VendorTable({ initialVendors, currentUserId }) {
         // Update local state
         setVendors(vendors.map(v => v.id === editingVendor.id ? data : v))
       } else {
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError || !user) {
+          throw new Error('User not authenticated')
+        }
+        
         // Insert new vendor
         const { data: newData, error } = await supabase
           .from('vendors')
           .insert({
             ...vendorData,
-            seller_id: currentUserId,
+            seller_id: user.id,
             // Warehouses are automatically accepted, others start as draft
             vendor_status: vendorData.vendor_type === 'warehouse' ? 'accepted' : 'draft'
           })
@@ -292,7 +304,9 @@ export default function VendorTable({ initialVendors, currentUserId }) {
         country: '',
         address: '',
         contactName: '',
-        vendorType: ''
+        vendorType: '',
+        phone: '',
+        wechat: ''
       })
       
       // Show success message
@@ -316,8 +330,10 @@ export default function VendorTable({ initialVendors, currentUserId }) {
       router.refresh()
     } catch (error) {
       console.error('Error adding vendor:', error)
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      
       // Better error message
-      const errorMessage = error?.message || error?.error_description || 'Unknown error occurred'
+      const errorMessage = error?.message || error?.error_description || error?.toString() || 'Unknown error occurred'
       
       // Check if it's a table not found error
       if (errorMessage.includes('relation') && errorMessage.includes('does not exist')) {
@@ -327,6 +343,10 @@ export default function VendorTable({ initialVendors, currentUserId }) {
             label: 'Go to setup',
             onClick: () => window.location.href = '/setup-vendors'
           }
+        })
+      } else if (errorMessage.includes('column') && (errorMessage.includes('phone') || errorMessage.includes('wechat'))) {
+        toast.error('Database schema needs update', {
+          description: 'The phone and wechat columns need to be added. Please run the migration in MIGRATION_INSTRUCTIONS.md'
         })
       } else {
         toast.error('Failed to add vendor', {
@@ -377,6 +397,18 @@ export default function VendorTable({ initialVendors, currentUserId }) {
       accessorKey: "contact_name",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Contact Name" />
+      ),
+    },
+    {
+      accessorKey: "phone",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Phone" />
+      ),
+    },
+    {
+      accessorKey: "wechat",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="WeChat" />
       ),
     },
     {
@@ -523,7 +555,9 @@ export default function VendorTable({ initialVendors, currentUserId }) {
             country: '',
             address: '',
             contactName: '',
-            vendorType: ''
+            vendorType: '',
+            phone: '',
+            wechat: ''
           })
         }
       }}>
@@ -628,6 +662,27 @@ export default function VendorTable({ initialVendors, currentUserId }) {
                   onChange={handleInputChange}
                   placeholder="Full address"
                   required
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  value={newVendor.phone}
+                  onChange={handleInputChange}
+                  placeholder="Phone number (optional)"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="wechat">WeChat ID</Label>
+                <Input
+                  id="wechat"
+                  name="wechat"
+                  value={newVendor.wechat}
+                  onChange={handleInputChange}
+                  placeholder="WeChat ID (optional)"
                 />
               </div>
             </div>

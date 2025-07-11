@@ -158,18 +158,55 @@ export default function ScheduleInspectionDialog({ open, onOpenChange, inspectio
                 <div className="text-sm text-muted-foreground mb-3">
                   <div className="flex items-center gap-2 mb-1">
                     <Package className="h-4 w-4" />
-                    <span className="font-medium">Purchase Orders:</span>
+                    <span className="font-medium">Purchase Orders & Items:</span>
                   </div>
-                  <div className="ml-6 space-y-1">
+                  <div className="ml-6 space-y-3">
                     {group.orders.map(order => (
-                      <div key={order.id} className="flex items-center justify-between">
-                        <span>{order.po_number}</span>
-                        <span className="text-xs">
-                          Ready: {formatDate(order.goods_ready_date)}
-                        </span>
+                      <div key={order.id} className="border-l-2 border-gray-200 pl-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium">{order.po_number}</span>
+                          <span className="text-xs text-gray-500">
+                            Ready: {formatDate(order.goods_ready_date)}
+                          </span>
+                        </div>
+                        {order.items && order.items.length > 0 && (
+                          <div className="space-y-1 text-xs">
+                            {order.items.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-gray-600">
+                                <span>
+                                  {item.product?.sku || 'SKU'}: {item.product?.product_name || 'Unknown'}
+                                </span>
+                                <span className="font-medium">
+                                  Qty: {item.quantity} {item.product?.unit_of_measure || 'units'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
+                  
+                  {/* SKU Summary */}
+                  {group.skuSummary && Object.keys(group.skuSummary).length > 0 && (
+                    <div className="mt-4 pt-3 border-t">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-medium text-sm">Total Items to Inspect:</span>
+                      </div>
+                      <div className="ml-6 space-y-1">
+                        {Object.entries(group.skuSummary).map(([sku, data]) => (
+                          <div key={sku} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">
+                              {sku}: {data.name}
+                            </span>
+                            <span className="font-medium">
+                              {data.quantity} {data.unit}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

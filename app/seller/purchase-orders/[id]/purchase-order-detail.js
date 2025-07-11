@@ -635,7 +635,14 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
               )}
               {order.goods_ready_date && (
                 <div>
-                  <p className="text-sm text-gray-500">Goods Ready Date</p>
+                  <p className="text-sm text-gray-500">
+                    Goods Ready Date
+                    {order.status === 'draft' && (
+                      <span className="text-xs text-gray-400 ml-1">
+                        (calculated)
+                      </span>
+                    )}
+                  </p>
                   <p className="font-medium">{formatDate(order.goods_ready_date)}</p>
                 </div>
               )}

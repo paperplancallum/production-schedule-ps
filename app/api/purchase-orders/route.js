@@ -120,6 +120,28 @@ export async function POST(request) {
       poNumber = `PO-${timestamp}`
     }
 
+    // Get lead times for all products in the order
+    let maxLeadTime = 0
+    if (items && items.length > 0) {
+      const productSupplierIds = items.map(item => item.product_supplier_id).filter(Boolean)
+      
+      if (productSupplierIds.length > 0) {
+        const { data: productSuppliers } = await supabase
+          .from('product_suppliers')
+          .select('id, lead_time_days')
+          .in('id', productSupplierIds)
+        
+        if (productSuppliers && productSuppliers.length > 0) {
+          maxLeadTime = Math.max(...productSuppliers.map(ps => ps.lead_time_days || 0))
+        }
+      }
+    }
+
+    // Calculate default goods_ready_date
+    const orderDate = new Date()
+    const goodsReadyDate = new Date(orderDate)
+    goodsReadyDate.setDate(goodsReadyDate.getDate() + (maxLeadTime || 0))
+
     // Create purchase order
     const { data: purchaseOrder, error: createError } = await supabase
       .from('purchase_orders')
@@ -127,6 +149,7 @@ export async function POST(request) {
         po_number: poNumber,
         seller_id: user.id,
         supplier_id,
+        goods_ready_date: goodsReadyDate.toISOString().split('T')[0], // Default goods ready date
         ...orderData
       })
       .select()

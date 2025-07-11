@@ -544,7 +544,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: deleteError.message }, { status: 400 })
     }
 
-    // Insert updated items
+    // Insert updated items and recalculate goods_ready_date
     if (body.items && body.items.length > 0) {
       const itemsToInsert = body.items.map(item => ({
         purchase_order_id: id,
@@ -562,6 +562,38 @@ export async function PUT(request, { params }) {
       if (insertError) {
         console.error('Error inserting items:', insertError)
         return NextResponse.json({ error: insertError.message }, { status: 400 })
+      }
+
+      // Get lead times for all products in the updated order
+      const productSupplierIds = body.items.map(item => item.product_supplier_id).filter(Boolean)
+      let maxLeadTime = 0
+      
+      if (productSupplierIds.length > 0) {
+        const { data: productSuppliers } = await supabase
+          .from('product_suppliers')
+          .select('id, lead_time_days')
+          .in('id', productSupplierIds)
+        
+        if (productSuppliers && productSuppliers.length > 0) {
+          maxLeadTime = Math.max(...productSuppliers.map(ps => ps.lead_time_days || 0))
+        }
+      }
+
+      // Recalculate goods_ready_date based on order date + max lead time
+      const orderDate = new Date(updatedOrder.order_date || updatedOrder.created_at)
+      const goodsReadyDate = new Date(orderDate)
+      goodsReadyDate.setDate(goodsReadyDate.getDate() + maxLeadTime)
+
+      // Update the goods_ready_date
+      const { error: updateDateError } = await supabase
+        .from('purchase_orders')
+        .update({
+          goods_ready_date: goodsReadyDate.toISOString().split('T')[0]
+        })
+        .eq('id', id)
+
+      if (updateDateError) {
+        console.error('Error updating goods_ready_date:', updateDateError)
       }
     }
 
