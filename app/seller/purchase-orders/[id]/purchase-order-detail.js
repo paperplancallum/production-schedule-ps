@@ -37,10 +37,6 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
   const [order, setOrder] = useState(initialOrder)
   const [loading, setLoading] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
-  
-  // Debug logging
-  console.log('Order data:', initialOrder)
-  console.log('Supplier data:', initialOrder?.supplier)
 
   const statusConfig = {
     draft: { label: 'Draft', color: 'secondary', icon: FileText },
@@ -82,6 +78,8 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
 
       if (response.ok) {
         const updatedOrder = await response.json()
+        console.log('Updated order from PATCH:', updatedOrder)
+        console.log('Status history:', updatedOrder.status_history)
         // The PATCH endpoint now returns the complete order with status history
         setOrder(updatedOrder)
         toast.success('Status updated successfully')
@@ -473,6 +471,7 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
           </Card>
 
           {/* Status History */}
+          {console.log('Rendering status history, order:', order, 'status_history:', order.status_history)}
           {order.status_history && order.status_history.length > 0 && (
             <Card>
               <CardHeader>

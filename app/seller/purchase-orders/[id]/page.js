@@ -18,7 +18,8 @@ export default async function PurchaseOrderPage({ params }) {
   }
 
   // Fetch supplier details separately with all fields
-  const { data: supplier } = await supabase
+  console.log('Fetching supplier with ID:', order.supplier_id)
+  const { data: supplier, error: supplierError } = await supabase
     .from('vendors')
     .select(`
       id, 
@@ -40,6 +41,11 @@ export default async function PurchaseOrderPage({ params }) {
     `)
     .eq('id', order.supplier_id)
     .single()
+  
+  if (supplierError) {
+    console.error('Error fetching supplier:', supplierError)
+  }
+  console.log('Supplier data:', supplier)
   
   // If supplier not found, use a default object
   // Map the correct field names for the component

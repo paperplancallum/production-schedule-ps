@@ -99,6 +99,8 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
 
       if (response.ok) {
         const updatedOrder = await response.json()
+        console.log('Vendor - Updated order from PATCH:', updatedOrder)
+        console.log('Vendor - Status history:', updatedOrder.status_history)
         // The PATCH endpoint now returns the complete order with status history
         setOrder(updatedOrder)
         toast.success('Status updated successfully')
