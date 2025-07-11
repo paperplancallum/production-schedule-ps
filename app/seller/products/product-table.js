@@ -1214,6 +1214,44 @@ export function ProductTable() {
         const value = product[condition.field]
         const filterValue = condition.value
 
+        // Handle date fields differently
+        if (condition.field === 'created_at') {
+          const dateValue = value ? new Date(value) : null
+          const filterDate = filterValue ? new Date(filterValue) : null
+          
+          if (!dateValue) return condition.operator === 'is_empty'
+          if (!filterDate && condition.operator !== 'is_empty' && condition.operator !== 'is_not_empty') return true
+          
+          // For date equality, compare only the date part (ignore time)
+          const getDateOnly = (date) => {
+            const d = new Date(date)
+            d.setHours(0, 0, 0, 0)
+            return d
+          }
+          
+          switch (condition.operator) {
+            case 'equals':
+              return getDateOnly(dateValue).getTime() === getDateOnly(filterDate).getTime()
+            case 'not_equals':
+              return getDateOnly(dateValue).getTime() !== getDateOnly(filterDate).getTime()
+            case 'greater_than':
+              return dateValue > filterDate
+            case 'less_than':
+              return dateValue < filterDate
+            case 'greater_or_equal':
+              return dateValue >= filterDate
+            case 'less_or_equal':
+              return dateValue <= filterDate
+            case 'is_empty':
+              return !value
+            case 'is_not_empty':
+              return !!value
+            default:
+              return true
+          }
+        }
+        
+        // Handle other fields
         switch (condition.operator) {
           case 'contains':
             return value && value.toString().toLowerCase().includes(filterValue.toLowerCase())

@@ -18,13 +18,11 @@ import {
 
 const FIELD_OPTIONS = [
   { value: 'product_name', label: 'Product Name', type: 'text' },
-  { value: 'sku', label: 'SKU', type: 'text' },
-  { value: 'brand', label: 'Brand', type: 'text' },
-  { value: 'category', label: 'Category', type: 'text' },
-  { value: 'unit_of_measure', label: 'Unit of Measure', type: 'text' },
-  { value: 'primary_supplier', label: 'Primary Supplier', type: 'text' },
+  { value: 'sku', label: 'Internal SKU', type: 'text' },
+  { value: 'primary_supplier_name', label: 'Primary Supplier', type: 'text' },
   { value: 'price', label: 'Price', type: 'number' },
-  { value: 'quantity_in_stock', label: 'Stock Quantity', type: 'number' },
+  { value: 'supplier_moq', label: 'MOQ', type: 'number' },
+  { value: 'created_at', label: 'Created Date', type: 'date' },
 ]
 
 const OPERATOR_OPTIONS = {
@@ -49,6 +47,14 @@ const OPERATOR_OPTIONS = {
     { value: 'less_or_equal', label: 'is less or equal to' },
     { value: 'is_empty', label: 'is empty' },
     { value: 'is_not_empty', label: 'is not empty' },
+  ],
+  date: [
+    { value: 'equals', label: 'is' },
+    { value: 'not_equals', label: 'is not' },
+    { value: 'greater_than', label: 'is after' },
+    { value: 'less_than', label: 'is before' },
+    { value: 'greater_or_equal', label: 'is on or after' },
+    { value: 'less_or_equal', label: 'is on or before' },
   ],
   select: [
     { value: 'equals', label: 'equals' },
@@ -92,7 +98,9 @@ export default function ProductFilters({ onFiltersChange, suppliers = [] }) {
   }
 
   const removeCondition = (conditionId) => {
-    setConditions(conditions.filter(c => c.id !== conditionId))
+    if (conditions.length > 1) {
+      setConditions(conditions.filter(c => c.id !== conditionId))
+    }
   }
 
   const updateCondition = (conditionId, updates) => {
@@ -297,7 +305,7 @@ export default function ProductFilters({ onFiltersChange, suppliers = [] }) {
                         </Select>
                       ) : (
                         <Input
-                          type={selectedField?.type || 'text'}
+                          type={selectedField?.type === 'date' ? 'date' : (selectedField?.type || 'text')}
                           value={isMultiSelect ? (Array.isArray(condition.value) ? condition.value.join(', ') : '') : condition.value}
                           onChange={(e) => {
                             if (isMultiSelect) {
@@ -307,7 +315,11 @@ export default function ProductFilters({ onFiltersChange, suppliers = [] }) {
                               updateCondition(condition.id, { value: e.target.value })
                             }
                           }}
-                          placeholder={isMultiSelect ? "Enter values separated by commas" : "Enter a value"}
+                          placeholder={
+                            selectedField?.type === 'date' ? "Select a date" :
+                            isMultiSelect ? "Enter values separated by commas" : 
+                            "Enter a value"
+                          }
                           className="w-48"
                           disabled={!condition.operator}
                         />
@@ -318,9 +330,14 @@ export default function ProductFilters({ onFiltersChange, suppliers = [] }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
-                    onClick={() => removeCondition(condition.id)}
+                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      removeCondition(condition.id)
+                    }}
                     disabled={conditions.length === 1}
+                    title={conditions.length === 1 ? "Cannot remove the last filter" : "Remove filter"}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
