@@ -31,7 +31,7 @@ export default async function PurchaseOrderPage({ params }) {
     vendor_name: supplier.vendor_name,
     vendor_type: supplier.vendor_type,
     vendor_email: supplier.email,  // Map 'email' to 'vendor_email'
-    vendor_phone: '',  // No phone field in vendors table
+    vendor_phone: supplier.vendor_phone || '',
     contact_name: supplier.contact_name,
     country: supplier.country,
     address: supplier.address
@@ -40,7 +40,10 @@ export default async function PurchaseOrderPage({ params }) {
     vendor_name: 'Unknown Supplier',
     vendor_type: 'unknown',
     vendor_email: '',
-    vendor_phone: ''
+    vendor_phone: '',
+    contact_name: '',
+    country: '',
+    address: ''
   }
 
   // Fetch order items with related data
@@ -95,10 +98,18 @@ export default async function PurchaseOrderPage({ params }) {
     .eq('purchase_order_id', order.id)
     .order('created_at', { ascending: false })
 
+  // Fetch seller data
+  const { data: seller } = await supabase
+    .from('sellers')
+    .select('*')
+    .eq('id', order.seller_id)
+    .single()
+
   // Combine all data
   const orderWithDetails = {
     ...order,
     supplier: supplierData,
+    seller: seller || {},
     items: itemsWithDetails,
     status_history: statusHistory || []
   }

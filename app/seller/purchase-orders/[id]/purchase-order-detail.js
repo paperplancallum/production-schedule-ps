@@ -29,11 +29,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label'
 import { formatCurrency } from '@/lib/utils'
 import jsPDF from 'jspdf'
+import EditPurchaseOrderDialog from './edit-purchase-order-dialog'
 
 export default function PurchaseOrderDetail({ order: initialOrder }) {
   const router = useRouter()
   const [order, setOrder] = useState(initialOrder)
   const [loading, setLoading] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
 
   const statusConfig = {
     draft: { label: 'Draft', color: 'secondary', icon: FileText },
@@ -119,7 +121,7 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
 
   const getNextStatuses = () => {
     const transitions = {
-      'draft': ['sent_to_supplier'],
+      'draft': [], // Remove sent_to_supplier - will be set automatically when emailing
       'sent_to_supplier': ['approved'],
       'approved': ['in_progress'],
       'in_progress': ['complete'],
@@ -323,7 +325,7 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
           <div className="flex gap-2">
             {order.status === 'draft' && (
               <>
-                <Button variant="outline" onClick={() => {}} disabled={loading}>
+                <Button variant="outline" onClick={() => setEditDialogOpen(true)} disabled={loading}>
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Order
                 </Button>
@@ -340,10 +342,12 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
-            <Button variant="outline" onClick={() => {}}>
-              <Mail className="h-4 w-4 mr-2" />
-              Email
-            </Button>
+            {order.status === 'draft' && (
+              <Button onClick={() => handleStatusUpdate('sent_to_supplier')} disabled={loading}>
+                <Mail className="h-4 w-4 mr-2" />
+                Send PO to Supplier
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -564,6 +568,17 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
           </Card>
         </div>
       </div>
+
+      {/* Edit Dialog */}
+      <EditPurchaseOrderDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        order={order}
+        onSuccess={(updatedOrder) => {
+          setOrder(updatedOrder)
+          router.refresh()
+        }}
+      />
     </div>
   )
 }
