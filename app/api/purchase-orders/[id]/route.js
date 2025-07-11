@@ -169,6 +169,24 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    // If status was updated, create a status history record with user info
+    if (body.status && body.status !== existingOrder.status) {
+      const { error: historyError } = await supabase
+        .from('purchase_order_status_history')
+        .insert({
+          purchase_order_id: id,
+          from_status: existingOrder.status,
+          to_status: body.status,
+          changed_by: user.id,
+          notes: body.statusNote || null
+        })
+
+      if (historyError) {
+        console.error('Error creating status history:', historyError)
+        // Don't fail the request if history creation fails
+      }
+    }
+
     return NextResponse.json(data)
   } catch (error) {
     console.error('Error in PATCH /api/purchase-orders/[id]:', error)
