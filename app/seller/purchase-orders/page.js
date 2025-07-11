@@ -38,6 +38,7 @@ export default function PurchaseOrdersPage() {
   const [inspections, setInspections] = useState([])
   const [inspectionMode, setInspectionMode] = useState(false)
   const [transferMode, setTransferMode] = useState(false)
+  const [transfers, setTransfers] = useState([])
   const [stats, setStats] = useState({
     total: 0,
     draft: 0,
@@ -48,14 +49,28 @@ export default function PurchaseOrdersPage() {
   useEffect(() => {
     loadPurchaseOrders()
     loadInspections()
+    loadTransfers()
   }, [statusFilter])
 
-  // Reload inspections when orders change
+  // Reload inspections and transfers when orders change
   useEffect(() => {
-    if (orders.length > 0 && inspections.length === 0) {
-      loadInspections()
+    if (orders.length > 0) {
+      if (inspections.length === 0) {
+        loadInspections()
+      }
+      loadTransfers()
     }
   }, [orders])
+
+  // Reload transfers when page gains focus (e.g., after returning from transfers page)
+  useEffect(() => {
+    const handleFocus = () => {
+      loadTransfers()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [])
 
 
   const loadPurchaseOrders = async () => {
@@ -106,6 +121,21 @@ export default function PurchaseOrdersPage() {
       }
     } catch (error) {
       console.error('Error loading inspections:', error)
+    }
+  }
+
+  const loadTransfers = async () => {
+    try {
+      const response = await fetch('/api/transfers')
+      const data = await response.json()
+
+      if (response.ok) {
+        setTransfers(data)
+      } else {
+        console.error('Error loading transfers:', data.error)
+      }
+    } catch (error) {
+      console.error('Error loading transfers:', error)
     }
   }
 
@@ -186,6 +216,13 @@ export default function PurchaseOrdersPage() {
     } else if (transferMode) {
       // In transfer mode, only allow single selection
       if (checked) {
+        // Check if order already has a transfer
+        const hasTransfer = transfers.some(t => t.purchase_order_id === orderId)
+        if (hasTransfer) {
+          toast.error('This order has already been transferred')
+          return
+        }
+        
         // Check if order status allows transfer
         if (order.status !== 'complete' && order.status !== 'approved' && order.status !== 'in_progress') {
           toast.error('Only approved, in progress, or completed orders can be received')
@@ -250,6 +287,10 @@ export default function PurchaseOrdersPage() {
     
     // Navigate to transfers page with PO data and instant flag
     router.push(`/seller/transfers?create=true&type=in&po=${encodeURIComponent(selectedOrder.po_number)}&instant=true`)
+    
+    // Clear selection and exit transfer mode
+    setSelectedOrders([])
+    setTransferMode(false)
   }
 
   const prepareInspectionData = () => {
@@ -494,18 +535,19 @@ export default function PurchaseOrdersPage() {
               <TableHead>Total</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Inspection</TableHead>
+              <TableHead>Transfer Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   Loading purchase orders...
                 </TableCell>
               </TableRow>
             ) : filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   <div className="flex flex-col items-center">
                     <FileText className="h-12 w-12 text-gray-400 mb-2" />
                     <p className="text-gray-500">No purchase orders found</p>
@@ -527,6 +569,9 @@ export default function PurchaseOrdersPage() {
                 
                 // Check if order already has an active inspection
                 const orderInspection = inspections.find(i => i.purchase_order_id === order.id)
+                
+                // Check if order has been transferred
+                const orderTransfer = transfers.find(t => t.purchase_order_id === order.id)
                 
                 // Determine if this order can be selected
                 let canSelect = true
@@ -551,7 +596,10 @@ export default function PurchaseOrdersPage() {
                   }
                 } else if (transferMode) {
                   // In transfer mode, apply restrictions
-                  if (order.status !== 'complete' && order.status !== 'approved' && order.status !== 'in_progress') {
+                  if (orderTransfer) {
+                    canSelect = false
+                    disabledReason = 'Already transferred'
+                  } else if (order.status !== 'complete' && order.status !== 'approved' && order.status !== 'in_progress') {
                     canSelect = false
                     disabledReason = 'Only approved, in progress, or completed orders can be transferred'
                   }
@@ -626,6 +674,16 @@ export default function PurchaseOrdersPage() {
                             {orderInspection.inspection_number || 'No Number'}
                           </Badge>
                         </div>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="cursor-pointer" onClick={() => handleRowClick(order.id)}>
+                      {orderTransfer ? (
+                        <Badge variant="green" className="text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Transferred
+                        </Badge>
                       ) : (
                         <span className="text-slate-400">-</span>
                       )}
