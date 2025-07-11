@@ -1112,22 +1112,6 @@ export function ProductTable() {
                       <p className="text-sm text-red-500 mt-1">{formErrors.sku}</p>
                     )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      value={formData.price}
-                      onChange={(e) =>
-                        setFormData({ ...formData, price: e.target.value })
-                      }
-                      placeholder="Will be inherited from function"
-                      disabled
-                      className="bg-gray-100"
-                    />
-                    <p className="text-xs text-muted-foreground">Price comes from primary supplier's default tier</p>
-                  </div>
                 </div>
                 <div className="px-6 py-4 border-t">
                   <Button type="submit" className="w-full">
@@ -1184,22 +1168,6 @@ export function ProductTable() {
                 {formErrors.sku && (
                   <p className="text-sm text-red-500 mt-1">{formErrors.sku}</p>
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_price">Price</Label>
-                <Input
-                  id="edit_price"
-                  type="number"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, price: e.target.value })
-                  }
-                  placeholder="Will be inherited from function"
-                  disabled
-                  className="bg-gray-100"
-                />
-                <p className="text-xs text-muted-foreground">Price comes from primary supplier's default tier</p>
               </div>
             </div>
             <div className="px-6 py-4 border-t">
