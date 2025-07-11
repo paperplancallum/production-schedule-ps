@@ -857,20 +857,21 @@ const columns = [
       // Get the first selected supplier ID
       let currentFirstSupplierId = null
       if (hasSelection) {
-        const firstSelectedProduct = table.options.data.find(p => 
-          selectedRowIds.includes(p.id)
-        )
+        // Row IDs are indices, not product IDs
+        const firstSelectedRowId = selectedRowIds[0]
+        const firstSelectedProduct = table.getRowModel().rows[firstSelectedRowId]?.original
         currentFirstSupplierId = firstSelectedProduct?.primary_supplier_id
       }
       
       // Count how many products can be selected (same supplier)
-      const selectableProducts = currentFirstSupplierId
-        ? table.options.data.filter(p => p.primary_supplier_id === currentFirstSupplierId)
-        : table.options.data
+      const allRows = table.getRowModel().rows
+      const selectableRows = currentFirstSupplierId
+        ? allRows.filter(row => row.original.primary_supplier_id === currentFirstSupplierId)
+        : allRows
       
       const selectedCount = selectedRowIds.length
-      const isAllSelected = selectableProducts.length > 0 && 
-        selectableProducts.every(p => selectedRowIds.includes(p.id))
+      const isAllSelected = selectableRows.length > 0 && 
+        selectableRows.every(row => selectedRowIds.includes(row.id))
       const isIndeterminate = selectedCount > 0 && !isAllSelected
       
       return (
@@ -880,14 +881,14 @@ const columns = [
             if (value) {
               // Select all products from the same supplier
               const newSelection = {}
-              selectableProducts.forEach(product => {
-                newSelection[product.id] = true
+              selectableRows.forEach(row => {
+                newSelection[row.id] = true
               })
               table.setRowSelection(newSelection)
               
               // Set first supplier if selecting from empty
-              if (!hasSelection && selectableProducts.length > 0) {
-                table.options.meta?.onFirstSupplierChange?.(selectableProducts[0].primary_supplier_id)
+              if (!hasSelection && selectableRows.length > 0) {
+                table.options.meta?.onFirstSupplierChange?.(selectableRows[0].original.primary_supplier_id)
               }
             } else {
               // Deselect all
@@ -908,9 +909,9 @@ const columns = [
       // Get the first selected supplier ID
       let currentFirstSupplierId = null
       if (hasSelection) {
-        const firstSelectedProduct = table.options.data.find(p => 
-          selectedRowIds.includes(p.id)
-        )
+        // Row IDs are indices, not product IDs
+        const firstSelectedRowId = selectedRowIds[0]
+        const firstSelectedProduct = table.getRowModel().rows[firstSelectedRowId]?.original
         currentFirstSupplierId = firstSelectedProduct?.primary_supplier_id
       }
       
@@ -937,9 +938,9 @@ const columns = [
             if (newSelectedIds.length === 0) {
               table.options.meta?.onFirstSupplierChange?.(null)
             } else if (newSelectedIds.length === 1) {
-              const firstProduct = table.options.data.find(p => 
-                p.id === newSelectedIds[0]
-              )
+              // Get the product from the row index
+              const firstRowId = newSelectedIds[0]
+              const firstProduct = table.getRowModel().rows[firstRowId]?.original
               table.options.meta?.onFirstSupplierChange?.(firstProduct?.primary_supplier_id)
             }
           }}
@@ -1425,26 +1426,27 @@ export function ProductTable() {
         </div>
         <div className="flex gap-2">
           {Object.keys(selectedRows).length > 0 && (() => {
-            const selectedIds = Object.keys(selectedRows).filter(id => selectedRows[id])
-            const selectedProducts = products.filter(product => selectedIds.includes(product.id))
+            const selectedRowIds = Object.keys(selectedRows).filter(id => selectedRows[id])
+            // Get products from row indices
+            const selectedProducts = selectedRowIds.map(rowId => products[parseInt(rowId)]).filter(Boolean)
             const suppliers = [...new Set(selectedProducts.map(product => product.primary_supplier_name).filter(Boolean))]
             const hasMultipleSuppliers = suppliers.length > 1
             const hasNoSupplier = selectedProducts.some(product => !product.primary_supplier_name)
             
             return (
               <Button
-                onClick={() => handleCreatePO(selectedIds)}
+                onClick={() => handleCreatePO(selectedProducts.map(p => p.id))}
                 variant={hasMultipleSuppliers || hasNoSupplier ? "outline" : "default"}
                 disabled={hasNoSupplier}
               >
                 <FileText className="mr-2 h-4 w-4" />
                 {hasNoSupplier 
-                  ? `Set Primary Supplier First (${selectedIds.length})`
+                  ? `Set Primary Supplier First (${selectedProducts.length})`
                   : hasMultipleSuppliers 
-                    ? `Multiple Suppliers (${selectedIds.length})`
+                    ? `Multiple Suppliers (${selectedProducts.length})`
                     : suppliers[0] 
-                      ? `Create PO - ${suppliers[0]} (${selectedIds.length})`
-                      : `Create PO (${selectedIds.length})`
+                      ? `Create PO - ${suppliers[0]} (${selectedProducts.length})`
+                      : `Create PO (${selectedProducts.length})`
                 }
               </Button>
             )
