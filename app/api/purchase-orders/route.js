@@ -93,12 +93,24 @@ export async function POST(request) {
     }
 
     // Generate PO number
-    const { data: poNumber, error: poError } = await supabase
-      .rpc('generate_po_number', { seller_id: user.id })
+    let poNumber;
+    try {
+      const { data, error: poError } = await supabase
+        .rpc('generate_po_number', { seller_id: user.id })
 
-    if (poError) {
-      console.error('Error generating PO number:', poError)
-      return NextResponse.json({ error: 'Failed to generate PO number' }, { status: 500 })
+      if (poError) {
+        console.error('Error generating PO number:', poError)
+        // Fallback to simple generation if function doesn't exist
+        const timestamp = Date.now()
+        poNumber = `PO-${timestamp}`
+      } else {
+        poNumber = data
+      }
+    } catch (error) {
+      console.error('Failed to call generate_po_number:', error)
+      // Fallback to simple generation
+      const timestamp = Date.now()
+      poNumber = `PO-${timestamp}`
     }
 
     // Create purchase order
