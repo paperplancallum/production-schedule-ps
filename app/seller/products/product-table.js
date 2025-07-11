@@ -1082,6 +1082,7 @@ export function ProductTable() {
   const [selectedRows, setSelectedRows] = useState({})
   const [createPODialogOpen, setCreatePODialogOpen] = useState(false)
   const [selectedSupplierForPO, setSelectedSupplierForPO] = useState(null)
+  const [selectedProductsForPO, setSelectedProductsForPO] = useState([])
   const [firstSelectedSupplierId, setFirstSelectedSupplierId] = useState(null)
   const [formData, setFormData] = useState({
     product_name: '',
@@ -1352,8 +1353,9 @@ export function ProductTable() {
       return
     }
     
-    // Set the selected supplier and open the dialog
+    // Set the selected supplier and products, then open the dialog
     setSelectedSupplierForPO(supplierData.id)
+    setSelectedProductsForPO(selectedProducts)
     setCreatePODialogOpen(true)
     // Clear selection after opening dialog
     setSelectedRows({})
@@ -1544,9 +1546,11 @@ export function ProductTable() {
         open={createPODialogOpen}
         onOpenChange={setCreatePODialogOpen}
         defaultSupplierId={selectedSupplierForPO}
+        defaultProducts={selectedProductsForPO}
         onSuccess={() => {
           setCreatePODialogOpen(false)
           setSelectedSupplierForPO(null)
+          setSelectedProductsForPO([])
           setSelectedRows({})
           setFirstSelectedSupplierId(null)
           toast.success('Purchase order created successfully')

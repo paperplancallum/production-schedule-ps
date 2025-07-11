@@ -13,7 +13,7 @@ import { Plus, Trash2, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
-export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSuccess, defaultSupplierId }) {
+export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSuccess, defaultSupplierId, defaultProducts = [] }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -42,6 +42,13 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
     loadSuppliers()
   }, [])
 
+  // Set default supplier when provided
+  useEffect(() => {
+    if (defaultSupplierId && open) {
+      setFormData(prev => ({ ...prev, supplier_id: defaultSupplierId }))
+    }
+  }, [defaultSupplierId, open])
+
   // Load products when supplier is selected
   useEffect(() => {
     if (formData.supplier_id) {
@@ -51,6 +58,62 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
       setItems([])
     }
   }, [formData.supplier_id])
+
+  // Pre-fill items when defaultProducts are provided
+  useEffect(() => {
+    if (defaultProducts.length > 0 && supplierProducts.length > 0 && open) {
+      const prefilledItems = []
+      
+      defaultProducts.forEach(product => {
+        // Find the product_supplier record
+        const productSupplier = supplierProducts.find(sp => sp.product?.id === product.id)
+        
+        if (productSupplier) {
+          // Get the default price tier or first tier
+          const defaultTier = productSupplier.price_tiers?.find(tier => tier.is_default) || 
+                             productSupplier.price_tiers?.[0]
+          
+          prefilledItems.push({
+            product_supplier_id: productSupplier.id,
+            product_id: product.id,
+            product_name: product.product_name,
+            sku: product.sku,
+            quantity: productSupplier.moq || 1,
+            unit_price: defaultTier?.unit_price || 0,
+            price_tier_id: defaultTier?.id || null,
+            moq: productSupplier.moq,
+            lead_time_days: productSupplier.lead_time_days
+          })
+        }
+      })
+      
+      if (prefilledItems.length > 0) {
+        setItems(prefilledItems)
+      }
+    }
+  }, [defaultProducts, supplierProducts, open])
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      // Reset form after a small delay to avoid flashing
+      setTimeout(() => {
+        setFormData({
+          supplier_id: '',
+          notes: '',
+          trade_terms: 'FOB'
+        })
+        setItems([])
+        setNewItem({
+          product_id: '',
+          quantity: 1,
+          unit_price: 0,
+          notes: ''
+        })
+        setError('')
+      }, 200)
+    }
+  }, [open])
 
   const loadSuppliers = async () => {
     const supabase = createClient()
