@@ -91,9 +91,9 @@ function ProductSuppliers({ productId, productName }) {
       // First, let's see all vendors to debug
       const { data: allVendors, error: allError } = await supabase
         .from('vendors')
-        .select('id, vendor_name, vendor_type, status')
+        .select('id, vendor_name, vendor_type, vendor_status')
         .eq('seller_id', userData.user.id)
-        .eq('status', 'accepted')
+        .eq('vendor_status', 'accepted')
 
       console.log('All accepted vendors:', allVendors)
 
@@ -101,7 +101,7 @@ function ProductSuppliers({ productId, productName }) {
         .from('vendors')
         .select('id, vendor_name, vendor_type')
         .eq('seller_id', userData.user.id)
-        .eq('status', 'accepted')
+        .eq('vendor_status', 'accepted')
         .eq('vendor_type', 'supplier')
         .order('vendor_name')
 
