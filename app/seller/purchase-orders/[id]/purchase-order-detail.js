@@ -247,14 +247,6 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
                   <span className="text-gray-500">Subtotal:</span>
                   <span className="font-medium">{formatCurrency(order.subtotal)}</span>
                 </div>
-                <div className="flex justify-end gap-4">
-                  <span className="text-gray-500">Tax:</span>
-                  <span className="font-medium">{formatCurrency(order.tax_amount)}</span>
-                </div>
-                <div className="flex justify-end gap-4">
-                  <span className="text-gray-500">Shipping:</span>
-                  <span className="font-medium">{formatCurrency(order.shipping_cost)}</span>
-                </div>
                 <div className="flex justify-end gap-4 text-lg font-semibold pt-2 border-t">
                   <span>Total:</span>
                   <span>{formatCurrency(order.total_amount)}</span>
@@ -427,20 +419,6 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
                 <div>
                   <Label className="text-sm text-gray-500">Actual Delivery</Label>
                   <p className="font-medium">{formatDate(order.actual_delivery_date)}</p>
-                </div>
-              )}
-              {order.shipping_method && (
-                <div>
-                  <Label className="text-sm text-gray-500">Shipping Method</Label>
-                  <p className="font-medium">{order.shipping_method}</p>
-                </div>
-              )}
-              {order.shipping_address && (
-                <div>
-                  <Label className="text-sm text-gray-500">Shipping Address</Label>
-                  <p className="font-medium whitespace-pre-line">
-                    {order.shipping_address}
-                  </p>
                 </div>
               )}
             </CardContent>
