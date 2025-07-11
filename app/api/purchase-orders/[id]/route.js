@@ -101,6 +101,8 @@ export async function PATCH(request, { params }) {
 
     // Check if user is either the seller or the supplier
     let hasPermission = false
+    let isVendor = false
+    
     if (existingOrder.seller_id === user.id) {
       hasPermission = true
     } else {
@@ -114,6 +116,7 @@ export async function PATCH(request, { params }) {
       
       if (vendor) {
         hasPermission = true
+        isVendor = true
       }
     }
 
@@ -126,8 +129,8 @@ export async function PATCH(request, { params }) {
       const validTransitions = {
         'draft': ['sent_to_supplier', 'cancelled'],
         'sent_to_supplier': ['approved', 'cancelled'],
-        'approved': ['in_progress', 'cancelled'],
-        'in_progress': ['complete', 'cancelled'],
+        'approved': isVendor ? ['in_progress'] : ['in_progress', 'cancelled'],
+        'in_progress': isVendor ? ['approved', 'complete'] : ['complete', 'cancelled'],
         'complete': [],
         'cancelled': []
       }
