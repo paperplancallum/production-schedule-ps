@@ -132,63 +132,7 @@ export default function TransfersPage() {
 
       // For now, we'll simulate transfers data
       // In a real implementation, this would fetch from a transfers table
-      const mockTransfers = [
-        {
-          id: '1',
-          transfer_number: 'TRF-2025-0001',
-          transfer_type: 'in',
-          purchase_order_number: 'PO-2025-0123',
-          from_location: 'Guangzhou Factory',
-          from_location_type: 'production',
-          to_location: 'Shenzhen Warehouse',
-          to_location_type: 'supplier_warehouse',
-          status: 'in_transit',
-          created_at: new Date().toISOString(),
-          estimated_arrival: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          tracking_number: 'SF1234567890',
-          carrier: 'SF Express',
-          items: [
-            { sku: 'PROD-001', product_name: 'Widget A', quantity: 500 },
-            { sku: 'PROD-002', product_name: 'Widget B', quantity: 300 }
-          ]
-        },
-        {
-          id: '2',
-          transfer_number: 'TRF-2025-0002',
-          transfer_type: 'transfer',
-          from_location: 'Shenzhen Warehouse',
-          from_location_type: 'supplier_warehouse',
-          to_location: 'LA 3PL Warehouse',
-          to_location_type: '3pl_warehouse',
-          status: 'arrived',
-          created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          estimated_arrival: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          actual_arrival: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          tracking_number: 'DHL9876543210',
-          carrier: 'DHL',
-          items: [
-            { sku: 'PROD-003', product_name: 'Gadget X', quantity: 1000 }
-          ]
-        },
-        {
-          id: '3',
-          transfer_number: 'TRF-2025-0003',
-          transfer_type: 'out',
-          from_location: 'LA 3PL Warehouse',
-          from_location_type: '3pl_warehouse',
-          to_location: 'Amazon FBA LAX9',
-          to_location_type: 'amazon_fba',
-          status: 'pending',
-          created_at: new Date().toISOString(),
-          estimated_arrival: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          tracking_number: '',
-          carrier: 'Amazon Partner Carrier',
-          items: [
-            { sku: 'PROD-001', product_name: 'Widget A', quantity: 200 },
-            { sku: 'PROD-003', product_name: 'Gadget X', quantity: 500 }
-          ]
-        }
-      ]
+      const mockTransfers = []
 
       const filteredTransfers = statusFilter === 'all' 
         ? mockTransfers 
