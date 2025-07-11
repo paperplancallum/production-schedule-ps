@@ -49,8 +49,11 @@ function ProductSuppliers({ productId, productName }) {
 
   useEffect(() => {
     fetchSuppliers()
-    fetchVendors()
   }, [productId])
+
+  useEffect(() => {
+    fetchVendors()
+  }, [productId, suppliers])
 
   const fetchSuppliers = async () => {
     try {
@@ -88,15 +91,6 @@ function ProductSuppliers({ productId, productName }) {
       const { data: userData } = await supabase.auth.getUser()
       if (!userData.user) return
 
-      // First, let's see all vendors to debug
-      const { data: allVendors, error: allError } = await supabase
-        .from('vendors')
-        .select('id, vendor_name, vendor_type, vendor_status')
-        .eq('seller_id', userData.user.id)
-        .eq('vendor_status', 'accepted')
-
-      console.log('All accepted vendors:', allVendors)
-
       const { data, error } = await supabase
         .from('vendors')
         .select('id, vendor_name, vendor_type')
@@ -106,8 +100,10 @@ function ProductSuppliers({ productId, productName }) {
         .order('vendor_name')
 
       if (!error && data) {
-        console.log('Filtered suppliers:', data)
-        setVendors(data)
+        // Filter out vendors that are already suppliers for this product
+        const existingSupplierIds = suppliers.map(s => s.vendor_id)
+        const availableVendors = data.filter(v => !existingSupplierIds.includes(v.id))
+        setVendors(availableVendors)
       } else if (error) {
         console.error('Error fetching vendors:', error)
       }
@@ -253,7 +249,7 @@ function ProductSuppliers({ productId, productName }) {
                   <SelectContent>
                     {vendors.length === 0 ? (
                       <SelectItem value="no-suppliers" disabled>
-                        No suppliers available
+                        {suppliers.length > 0 ? 'All available suppliers have been added' : 'No suppliers available'}
                       </SelectItem>
                     ) : (
                       vendors.map((vendor) => (

@@ -87,6 +87,7 @@ All tables use RLS policies to ensure:
 - Implemented expandable suppliers sub-table
 - Fixed vendor column name issue (`vendor_status` vs `status`)
 - Added inline duplicate SKU validation
+- Prevented duplicate suppliers per product (filters dropdown)
 
 ### 2025-01-10
 - Initial products implementation
