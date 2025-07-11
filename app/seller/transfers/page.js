@@ -529,7 +529,8 @@ export default function TransfersPage() {
               <TableHead>Type</TableHead>
               <TableHead>From</TableHead>
               <TableHead>To</TableHead>
-              <TableHead>SKU / Quantity</TableHead>
+              <TableHead>SKU</TableHead>
+              <TableHead>Quantity</TableHead>
               <TableHead>Est. Arrival</TableHead>
               <TableHead>Tracking</TableHead>
               <TableHead>Status</TableHead>
@@ -539,13 +540,13 @@ export default function TransfersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   Loading transfers...
                 </TableCell>
               </TableRow>
             ) : filteredTransfers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   <div className="flex flex-col items-center">
                     <Package className="h-12 w-12 text-gray-400 mb-2" />
                     <p className="text-gray-500">No transfers found</p>
@@ -624,18 +625,21 @@ export default function TransfersPage() {
                       </div>
                     </TableCell>
                     <TableCell onClick={() => handleRowClick(transfer.id)}>
-                      <div className="text-sm">
-                        {transfer.items && transfer.items.length > 0 ? (
-                          <>
-                            <div className="font-medium">{transfer.items[0].sku}</div>
-                            <div className="text-xs text-slate-500">
-                              {transfer.items[0].quantity} {transfer.items[0].unit || 'units'}
-                            </div>
-                          </>
-                        ) : (
-                          <span className="text-slate-400">No items</span>
-                        )}
-                      </div>
+                      {transfer.items && transfer.items.length > 0 ? (
+                        <span className="font-medium">{transfer.items[0].sku}</span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell onClick={() => handleRowClick(transfer.id)}>
+                      {transfer.items && transfer.items.length > 0 ? (
+                        <div className="text-sm">
+                          <span className="font-medium">{transfer.items[0].quantity}</span>
+                          <span className="text-slate-500 ml-1">{transfer.items[0].unit || 'units'}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
                     </TableCell>
                     <TableCell onClick={() => handleRowClick(transfer.id)}>
                       {formatDate(transfer.estimated_arrival)}
