@@ -23,7 +23,7 @@ export default async function VendorProductsPage() {
     redirect('/vendor/dashboard')
   }
 
-  // First try to fetch with product_suppliers join
+  // Fetch products assigned to this vendor through product_suppliers
   let { data: products, error } = await supabase
     .from('products')
     .select(`
@@ -33,6 +33,7 @@ export default async function VendorProductsPage() {
         vendor_id,
         is_primary,
         lead_time_days,
+        moq,
         supplier_price_tiers (
           id,
           minimum_order_quantity,
@@ -41,21 +42,11 @@ export default async function VendorProductsPage() {
         )
       )
     `)
-    .eq('seller_id', vendor.seller_id)
     .eq('product_suppliers.vendor_id', vendor.id)
     .order('created_at', { ascending: false })
 
-  // If product_suppliers table doesn't exist, fetch products without join
-  if (error && error.message?.includes('product_suppliers')) {
-    console.log('product_suppliers table not found, fetching products without supplier info')
-    const result = await supabase
-      .from('products')
-      .select('*')
-      .eq('seller_id', vendor.seller_id)
-      .order('created_at', { ascending: false })
-    
-    products = result.data
-    error = result.error
+  if (error) {
+    console.error('Error fetching vendor products:', error)
   }
 
   // Additional debug: Check if there are any product_suppliers entries for this vendor
