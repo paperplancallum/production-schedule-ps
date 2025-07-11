@@ -98,17 +98,24 @@ export default function InspectionsPage() {
       if (error) {
         console.error('Error fetching inspections:', error)
         // If table doesn't exist, just show empty state
-        if (error.code === '42P01') {
+        if (error.code === '42P01' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+          console.log('Inspections table not found, showing empty state')
           setInspections([])
           return
         }
-        throw error
+        // For other errors, still show empty state but log the error
+        setInspections([])
+        return
       }
 
       setInspections(data || [])
     } catch (error) {
-      console.error('Error fetching inspections:', error)
-      toast.error('Failed to load inspections')
+      console.error('Error in fetchInspections:', error)
+      // Don't show error toast for missing table
+      if (!error.message?.includes('relation') && !error.message?.includes('does not exist')) {
+        toast.error('Failed to load inspections')
+      }
+      setInspections([])
     } finally {
       setLoading(false)
     }
