@@ -4,12 +4,13 @@ import PurchaseOrderDetail from './purchase-order-detail'
 
 export default async function PurchaseOrderPage({ params }) {
   const supabase = await createClient()
+  const { id } = await params
   
   // Get purchase order
   const { data: order, error } = await supabase
     .from('purchase_orders')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (error || !order) {

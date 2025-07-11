@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET(request, { params }) {
   try {
     const supabase = await createClient()
-    const { id } = params
+    const { id } = await params
 
     // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -79,7 +79,7 @@ export async function GET(request, { params }) {
 export async function PATCH(request, { params }) {
   try {
     const supabase = await createClient()
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
 
     // Get current user
@@ -148,7 +148,7 @@ export async function PATCH(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const supabase = await createClient()
-    const { id } = params
+    const { id } = await params
 
     // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()

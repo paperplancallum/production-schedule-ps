@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { jsPDF } from 'jspdf'
-import 'jspdf-autotable'
+const jsPDF = require('jspdf').jsPDF
+require('jspdf-autotable')
 
 export async function GET(request, { params }) {
   try {
     const supabase = await createClient()
-    const { id } = params
+    const { id } = await params
 
     // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
