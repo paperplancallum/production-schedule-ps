@@ -30,6 +30,7 @@ import { Label } from '@/components/ui/label'
 import { formatCurrency } from '@/lib/utils'
 import jsPDF from 'jspdf'
 import EditPurchaseOrderDialog from './edit-purchase-order-dialog'
+import { toast } from 'sonner'
 
 export default function PurchaseOrderDetail({ order: initialOrder }) {
   const router = useRouter()
@@ -77,18 +78,29 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
 
       if (response.ok) {
         const updatedOrder = await response.json()
-        setOrder({
-          ...order,
-          status: updatedOrder.status,
-          updated_at: updatedOrder.updated_at
-        })
+        
+        // Fetch updated order with status history
+        const historyResponse = await fetch(`/api/purchase-orders/${order.id}`)
+        if (historyResponse.ok) {
+          const fullOrder = await historyResponse.json()
+          setOrder(fullOrder)
+          toast.success('Status updated successfully')
+        } else {
+          // Still update with what we have
+          setOrder({
+            ...order,
+            status: updatedOrder.status,
+            updated_at: updatedOrder.updated_at
+          })
+          toast.success('Status updated')
+        }
       } else {
         const error = await response.json()
-        alert(`Error updating status: ${error.error}`)
+        toast.error(`Error updating status: ${error.error}`)
       }
     } catch (error) {
       console.error('Error updating status:', error)
-      alert('Failed to update status')
+      toast.error('Failed to update status')
     } finally {
       setLoading(false)
     }
@@ -106,14 +118,15 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
       })
 
       if (response.ok) {
+        toast.success('Purchase order deleted')
         router.push('/seller/purchase-orders')
       } else {
         const error = await response.json()
-        alert(`Error deleting order: ${error.error}`)
+        toast.error(`Error deleting order: ${error.error}`)
       }
     } catch (error) {
       console.error('Error deleting order:', error)
-      alert('Failed to delete order')
+      toast.error('Failed to delete order')
     } finally {
       setLoading(false)
     }
@@ -157,52 +170,106 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
       pdf.setLineWidth(0.5)
       pdf.line(20, 60, 190, 60)
       
-      // Buyer and Supplier info
+      // Buyer and Supplier info side by side
       let yPos = 70
+      
+      // Buyer (Seller) info - Left side
       pdf.setFontSize(14)
       pdf.setFont(undefined, 'bold')
       pdf.text('FROM (BUYER)', 20, yPos)
+      
+      pdf.setFontSize(11)
+      pdf.setFont(undefined, 'normal')
+      yPos += 8
+      
+      const seller = order.seller || {}
+      pdf.text(seller.company_name || seller.full_name || 'Buyer Name', 20, yPos)
+      yPos += 6
+      
+      // Address
+      if (seller.address_line1) {
+        pdf.text(seller.address_line1, 20, yPos)
+        yPos += 6
+        if (seller.address_line2) {
+          pdf.text(seller.address_line2, 20, yPos)
+          yPos += 6
+        }
+        const cityStateZip = [seller.city, seller.state, seller.zip_code].filter(Boolean).join(', ')
+        if (cityStateZip) {
+          pdf.text(cityStateZip, 20, yPos)
+          yPos += 6
+        }
+        if (seller.country) {
+          pdf.text(seller.country, 20, yPos)
+          yPos += 6
+        }
+      }
+      
+      // Contact info
+      if (seller.business_email || seller.email) {
+        pdf.text(`Email: ${seller.business_email || seller.email}`, 20, yPos)
+        yPos += 6
+      }
+      if (seller.business_phone || seller.phone_number) {
+        pdf.text(`Phone: ${seller.business_phone || seller.phone_number}`, 20, yPos)
+        yPos += 6
+      }
+      if (seller.tax_id) {
+        pdf.text(`Tax ID: ${seller.tax_id}`, 20, yPos)
+      }
+      
+      // Supplier (Vendor) info - Right side
+      yPos = 70
+      pdf.setFontSize(14)
+      pdf.setFont(undefined, 'bold')
       pdf.text('TO (SUPPLIER)', 110, yPos)
       
       pdf.setFontSize(11)
       pdf.setFont(undefined, 'normal')
       yPos += 8
       
-      // Buyer info
-      const seller = order.seller || {}
-      pdf.text(seller.company_name || 'Company Name', 20, yPos)
+      const supplier = order.supplier || {}
+      pdf.text(supplier.vendor_name || 'Supplier Name', 110, yPos)
       yPos += 6
-      if (seller.address) {
-        pdf.text(seller.address, 20, yPos)
+      
+      // Vendor Address
+      if (supplier.address_line1) {
+        pdf.text(supplier.address_line1, 110, yPos)
         yPos += 6
-      }
-      if (seller.email) {
-        pdf.text(`Email: ${seller.email}`, 20, yPos)
-        yPos += 6
-      }
-      if (seller.phone_number) {
-        pdf.text(`Phone: ${seller.phone_number}`, 20, yPos)
+        if (supplier.address_line2) {
+          pdf.text(supplier.address_line2, 110, yPos)
+          yPos += 6
+        }
+        const vendorCityStateZip = [supplier.city, supplier.state, supplier.zip_code].filter(Boolean).join(', ')
+        if (vendorCityStateZip) {
+          pdf.text(vendorCityStateZip, 110, yPos)
+          yPos += 6
+        }
+        if (supplier.country) {
+          pdf.text(supplier.country, 110, yPos)
+          yPos += 6
+        }
       }
       
-      // Supplier info
-      yPos = 78
-      const supplier = order.supplier || {}
-      pdf.text(supplier.vendor_name || 'Unknown Supplier', 110, yPos)
-      yPos += 6
-      if (supplier.address) {
-        pdf.text(supplier.address, 110, yPos)
-        yPos += 6
-      }
+      // Vendor Contact info
       if (supplier.vendor_email) {
         pdf.text(`Email: ${supplier.vendor_email}`, 110, yPos)
         yPos += 6
       }
-      if (supplier.contact_name) {
-        pdf.text(`Contact: ${supplier.contact_name}`, 110, yPos)
+      if (supplier.vendor_phone) {
+        pdf.text(`Phone: ${supplier.vendor_phone}`, 110, yPos)
+        yPos += 6
+      }
+      if (supplier.contact_person) {
+        pdf.text(`Contact: ${supplier.contact_person}`, 110, yPos)
+        yPos += 6
+      }
+      if (supplier.tax_id) {
+        pdf.text(`Tax ID: ${supplier.tax_id}`, 110, yPos)
       }
       
-      // Items table
-      yPos = 120
+      // Items table - adjust position based on how much space the addresses took
+      yPos = Math.max(yPos + 15, 140)
       pdf.setFontSize(12)
       pdf.setFont(undefined, 'bold')
       
@@ -270,9 +337,10 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
       
       // Save the PDF
       pdf.save(`PO-${order.po_number}.pdf`)
+      toast.success('PDF downloaded successfully')
     } catch (error) {
       console.error('Error generating PDF:', error)
-      alert('Failed to generate PDF')
+      toast.error('Failed to generate PDF')
     } finally {
       setLoading(false)
     }

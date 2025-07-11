@@ -30,6 +30,7 @@ import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import { vendorStatusConfig, getVendorStatus, getSellerStatus, getVendorStatusTransitions } from '@/lib/vendor-status-mapping'
 import jsPDF from 'jspdf'
+import { toast } from 'sonner'
 
 export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
   const router = useRouter()
@@ -98,19 +99,30 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
 
       if (response.ok) {
         const updatedOrder = await response.json()
-        setOrder({
-          ...order,
-          status: updatedOrder.status,
-          goods_ready_date: updatedOrder.goods_ready_date,
-          updated_at: updatedOrder.updated_at
-        })
+        
+        // Fetch updated order with status history
+        const historyResponse = await fetch(`/api/purchase-orders/${order.id}`)
+        if (historyResponse.ok) {
+          const fullOrder = await historyResponse.json()
+          setOrder(fullOrder)
+          toast.success('Status updated successfully')
+        } else {
+          // Still update with what we have
+          setOrder({
+            ...order,
+            status: updatedOrder.status,
+            goods_ready_date: updatedOrder.goods_ready_date,
+            updated_at: updatedOrder.updated_at
+          })
+          toast.success('Status updated')
+        }
       } else {
         const error = await response.json()
-        alert(`Error updating status: ${error.error}`)
+        toast.error(`Error updating status: ${error.error}`)
       }
     } catch (error) {
       console.error('Error updating status:', error)
-      alert('Failed to update status')
+      toast.error('Failed to update status')
     } finally {
       setLoading(false)
     }
@@ -129,19 +141,29 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
 
       if (response.ok) {
         const updatedOrder = await response.json()
-        setOrder({
-          ...order,
-          goods_ready_date: updatedOrder.goods_ready_date,
-          updated_at: updatedOrder.updated_at
-        })
-        alert('Goods ready date updated successfully')
+        
+        // Fetch updated order with status history
+        const historyResponse = await fetch(`/api/purchase-orders/${order.id}`)
+        if (historyResponse.ok) {
+          const fullOrder = await historyResponse.json()
+          setOrder(fullOrder)
+          toast.success('Goods ready date updated successfully')
+        } else {
+          // Still update with what we have
+          setOrder({
+            ...order,
+            goods_ready_date: updatedOrder.goods_ready_date,
+            updated_at: updatedOrder.updated_at
+          })
+          toast.success('Goods ready date updated')
+        }
       } else {
         const error = await response.json()
-        alert(`Error updating goods ready date: ${error.error}`)
+        toast.error(`Error updating goods ready date: ${error.error}`)
       }
     } catch (error) {
       console.error('Error updating goods ready date:', error)
-      alert('Failed to update goods ready date')
+      toast.error('Failed to update goods ready date')
     } finally {
       setLoading(false)
     }
@@ -168,8 +190,10 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
       pdf.setLineWidth(0.5)
       pdf.line(20, 60, 190, 60)
       
-      // Buyer info
+      // Buyer and Supplier info side by side
       let yPos = 70
+      
+      // Buyer (Seller) info - Left side
       pdf.setFontSize(14)
       pdf.setFont(undefined, 'bold')
       pdf.text('FROM (BUYER)', 20, yPos)
@@ -179,22 +203,93 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
       yPos += 8
       
       const seller = order.seller || {}
-      pdf.text(seller.company_name || 'Company Name', 20, yPos)
+      pdf.text(seller.company_name || seller.full_name || 'Buyer Name', 20, yPos)
       yPos += 6
-      if (seller.address) {
-        pdf.text(seller.address, 20, yPos)
+      
+      // Address
+      if (seller.address_line1) {
+        pdf.text(seller.address_line1, 20, yPos)
         yPos += 6
-      }
-      if (seller.email) {
-        pdf.text(`Email: ${seller.email}`, 20, yPos)
-        yPos += 6
-      }
-      if (seller.phone_number) {
-        pdf.text(`Phone: ${seller.phone_number}`, 20, yPos)
+        if (seller.address_line2) {
+          pdf.text(seller.address_line2, 20, yPos)
+          yPos += 6
+        }
+        const cityStateZip = [seller.city, seller.state, seller.zip_code].filter(Boolean).join(', ')
+        if (cityStateZip) {
+          pdf.text(cityStateZip, 20, yPos)
+          yPos += 6
+        }
+        if (seller.country) {
+          pdf.text(seller.country, 20, yPos)
+          yPos += 6
+        }
       }
       
-      // Items table
-      yPos = 120
+      // Contact info
+      if (seller.business_email || seller.email) {
+        pdf.text(`Email: ${seller.business_email || seller.email}`, 20, yPos)
+        yPos += 6
+      }
+      if (seller.business_phone || seller.phone_number) {
+        pdf.text(`Phone: ${seller.business_phone || seller.phone_number}`, 20, yPos)
+        yPos += 6
+      }
+      if (seller.tax_id) {
+        pdf.text(`Tax ID: ${seller.tax_id}`, 20, yPos)
+      }
+      
+      // Supplier (Vendor) info - Right side
+      yPos = 70
+      pdf.setFontSize(14)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('TO (SUPPLIER)', 110, yPos)
+      
+      pdf.setFontSize(11)
+      pdf.setFont(undefined, 'normal')
+      yPos += 8
+      
+      const vendor = order.vendor || {}
+      pdf.text(vendor.vendor_name || 'Supplier Name', 110, yPos)
+      yPos += 6
+      
+      // Vendor Address
+      if (vendor.address_line1) {
+        pdf.text(vendor.address_line1, 110, yPos)
+        yPos += 6
+        if (vendor.address_line2) {
+          pdf.text(vendor.address_line2, 110, yPos)
+          yPos += 6
+        }
+        const vendorCityStateZip = [vendor.city, vendor.state, vendor.zip_code].filter(Boolean).join(', ')
+        if (vendorCityStateZip) {
+          pdf.text(vendorCityStateZip, 110, yPos)
+          yPos += 6
+        }
+        if (vendor.country) {
+          pdf.text(vendor.country, 110, yPos)
+          yPos += 6
+        }
+      }
+      
+      // Vendor Contact info
+      if (vendor.vendor_email) {
+        pdf.text(`Email: ${vendor.vendor_email}`, 110, yPos)
+        yPos += 6
+      }
+      if (vendor.vendor_phone) {
+        pdf.text(`Phone: ${vendor.vendor_phone}`, 110, yPos)
+        yPos += 6
+      }
+      if (vendor.contact_person) {
+        pdf.text(`Contact: ${vendor.contact_person}`, 110, yPos)
+        yPos += 6
+      }
+      if (vendor.tax_id) {
+        pdf.text(`Tax ID: ${vendor.tax_id}`, 110, yPos)
+      }
+      
+      // Items table - adjust position based on how much space the addresses took
+      yPos = Math.max(yPos + 15, 140)
       pdf.setFontSize(12)
       pdf.setFont(undefined, 'bold')
       
@@ -262,9 +357,10 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
       
       // Save the PDF
       pdf.save(`PO-${order.po_number}.pdf`)
+      toast.success('PDF downloaded successfully')
     } catch (error) {
       console.error('Error generating PDF:', error)
-      alert('Failed to generate PDF')
+      toast.error('Failed to generate PDF')
     } finally {
       setLoading(false)
     }

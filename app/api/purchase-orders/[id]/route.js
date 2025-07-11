@@ -69,6 +69,41 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    // Fetch user details for status history
+    if (data.status_history && data.status_history.length > 0) {
+      const statusHistoryWithUsers = await Promise.all(
+        data.status_history.map(async (history) => {
+          if (!history.changed_by) return history
+          
+          // Try to find if it's a seller
+          const { data: seller } = await supabase
+            .from('sellers')
+            .select('id, company_name, full_name')
+            .eq('id', history.changed_by)
+            .single()
+          
+          if (seller) {
+            return { ...history, changed_by_user: { type: 'seller', name: seller.company_name || seller.full_name || 'Seller' } }
+          }
+          
+          // Try to find if it's a vendor
+          const { data: vendor } = await supabase
+            .from('vendors')
+            .select('id, vendor_name')
+            .eq('user_id', history.changed_by)
+            .single()
+          
+          if (vendor) {
+            return { ...history, changed_by_user: { type: 'vendor', name: vendor.vendor_name } }
+          }
+          
+          return history
+        })
+      )
+      
+      data.status_history = statusHistoryWithUsers
+    }
+
     return NextResponse.json(data)
   } catch (error) {
     console.error('Error in GET /api/purchase-orders/[id]:', error)

@@ -17,10 +17,27 @@ export default async function PurchaseOrderPage({ params }) {
     notFound()
   }
 
-  // Fetch supplier details separately
+  // Fetch supplier details separately with all fields
   const { data: supplier } = await supabase
     .from('vendors')
-    .select('id, vendor_name, vendor_type, email, contact_name, country, address')
+    .select(`
+      id, 
+      vendor_name, 
+      vendor_type, 
+      vendor_email,
+      vendor_phone,
+      contact_person,
+      address_line1,
+      address_line2,
+      city,
+      state,
+      zip_code,
+      country,
+      tax_id,
+      email,
+      contact_name,
+      address
+    `)
     .eq('id', order.supplier_id)
     .single()
   
@@ -30,19 +47,35 @@ export default async function PurchaseOrderPage({ params }) {
     id: supplier.id,
     vendor_name: supplier.vendor_name,
     vendor_type: supplier.vendor_type,
-    vendor_email: supplier.email,  // Map 'email' to 'vendor_email'
+    vendor_email: supplier.vendor_email || supplier.email || '',
     vendor_phone: supplier.vendor_phone || '',
-    contact_name: supplier.contact_name,
-    country: supplier.country,
-    address: supplier.address
+    contact_person: supplier.contact_person || supplier.contact_name || '',
+    address_line1: supplier.address_line1 || '',
+    address_line2: supplier.address_line2 || '',
+    city: supplier.city || '',
+    state: supplier.state || '',
+    zip_code: supplier.zip_code || '',
+    country: supplier.country || '',
+    tax_id: supplier.tax_id || '',
+    // Keep legacy fields for backward compatibility
+    contact_name: supplier.contact_person || supplier.contact_name || '',
+    address: supplier.address || ''
   } : {
     id: order.supplier_id,
     vendor_name: 'Unknown Supplier',
     vendor_type: 'unknown',
     vendor_email: '',
     vendor_phone: '',
-    contact_name: '',
+    contact_person: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    zip_code: '',
     country: '',
+    tax_id: '',
+    // Legacy fields
+    contact_name: '',
     address: ''
   }
 
