@@ -34,8 +34,6 @@ export async function GET(request) {
 
     if (error) {
       console.error('Error fetching purchase orders:', error)
-      console.error('Full GET error details:', JSON.stringify(error, null, 2))
-      console.error('Query details:', { vendorId, status })
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
@@ -134,20 +132,17 @@ export async function POST(request) {
 
     if (createError) {
       console.error('Error creating purchase order:', createError)
-      console.error('Full PO creation error:', JSON.stringify(createError, null, 2))
-      console.error('PO data:', { po_number: poNumber, seller_id: user.id, supplier_id, ...orderData })
       return NextResponse.json({ error: createError.message }, { status: 400 })
     }
 
     // Create purchase order items
-    // Temporarily simplify to avoid RLS policy errors
     const itemsToInsert = items.map(item => ({
       purchase_order_id: purchaseOrder.id,
       product_id: item.product_id,
-      // product_supplier_id: item.product_supplier_id, // Temporarily disabled
+      product_supplier_id: item.product_supplier_id,
       quantity: item.quantity,
       unit_price: item.unit_price,
-      // price_tier_id: item.price_tier_id, // Temporarily disabled
+      price_tier_id: item.price_tier_id,
       notes: item.notes
     }))
 
@@ -163,8 +158,6 @@ export async function POST(request) {
         .eq('id', purchaseOrder.id)
 
       console.error('Error creating purchase order items:', itemsError)
-      console.error('Full error details:', JSON.stringify(itemsError, null, 2))
-      console.error('Items being inserted:', JSON.stringify(itemsToInsert, null, 2))
       return NextResponse.json({ error: itemsError.message }, { status: 400 })
     }
 
