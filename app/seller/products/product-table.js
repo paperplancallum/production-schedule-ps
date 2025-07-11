@@ -192,31 +192,32 @@ function ProductSuppliers({ productId, productName }) {
           No suppliers added yet
         </div>
       ) : (
-        <div className="rounded-md border">
+        <div className="rounded-lg border border-slate-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b bg-white">
-                <th className="text-left p-2">Supplier Name</th>
-                <th className="text-left p-2">Lead Time (days)</th>
-                <th className="text-left p-2">Min Order Qty</th>
-                <th className="text-left p-2">Unit Price</th>
-                <th className="text-left p-2">Actions</th>
+              <tr className="border-b border-slate-200 bg-white">
+                <th className="text-left p-2 font-medium text-slate-700">Supplier Name</th>
+                <th className="text-left p-2 font-medium text-slate-700">Lead Time (days)</th>
+                <th className="text-left p-2 font-medium text-slate-700">Min Order Qty</th>
+                <th className="text-left p-2 font-medium text-slate-700">Unit Price</th>
+                <th className="text-left p-2 font-medium text-slate-700">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {suppliers.map((supplier) => (
-                <tr key={supplier.id} className="border-b bg-white">
-                  <td className="p-2">{supplier.vendors?.vendor_name || 'Unknown'}</td>
-                  <td className="p-2">{supplier.lead_time_days} days</td>
-                  <td className="p-2">{supplier.minimum_order_quantity}</td>
-                  <td className="p-2">${parseFloat(supplier.unit_price).toFixed(2)}</td>
+              {suppliers.map((supplier, index) => (
+                <tr key={supplier.id} className={`bg-white ${index < suppliers.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                  <td className="p-2 text-slate-900">{supplier.vendors?.vendor_name || 'Unknown'}</td>
+                  <td className="p-2 text-slate-600">{supplier.lead_time_days} days</td>
+                  <td className="p-2 text-slate-600">{supplier.minimum_order_quantity}</td>
+                  <td className="p-2 text-slate-600">${parseFloat(supplier.unit_price).toFixed(2)}</td>
                   <td className="p-2">
                     <Button 
                       variant="ghost" 
                       size="sm"
                       onClick={() => handleDeleteSupplier(supplier.id)}
+                      className="h-7 w-7 p-0 hover:bg-slate-100"
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-3 w-3 text-slate-500" />
                     </Button>
                   </td>
                 </tr>
