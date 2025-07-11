@@ -346,27 +346,20 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
                     const toVendorStatus = getVendorStatus(history.to_status)
                     
                     return (
-                      <div key={history.id} className="flex items-start gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            {fromVendorStatus ? (
-                              <Badge variant="outline" className="text-xs">
-                                {vendorStatusConfig[fromVendorStatus]?.label || 'Created'}
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-gray-500">Created</span>
-                            )}
-                            <span className="text-gray-500">→</span>
+                      <div key={history.id} className="border-l-2 border-gray-200 pl-4 pb-4 last:border-0">
+                        <div className="relative">
+                          <div className="absolute -left-6 top-0 w-3 h-3 bg-white border-2 border-gray-400 rounded-full"></div>
+                          <div className="flex items-center gap-2 mb-1">
                             <Badge variant={vendorStatusConfig[toVendorStatus]?.color} className="text-xs">
                               {vendorStatusConfig[toVendorStatus]?.label}
                             </Badge>
                           </div>
+                          <p className="text-xs text-gray-500">
+                            {formatDateTime(history.created_at)}
+                          </p>
                           {history.notes && (
                             <p className="text-sm text-gray-600 mt-1">{history.notes}</p>
                           )}
-                          <p className="text-xs text-gray-500 mt-1">
-                            {formatDateTime(history.created_at)}
-                          </p>
                         </div>
                       </div>
                     )
