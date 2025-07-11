@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-const jsPDF = require('jspdf').jsPDF
-require('jspdf-autotable')
 
 export async function GET(request, { params }) {
   try {
@@ -63,91 +61,105 @@ export async function GET(request, { params }) {
       `)
       .eq('purchase_order_id', order.id)
 
-    // Create PDF
-    const doc = new jsPDF()
-    
-    // Header
-    doc.setFontSize(20)
-    doc.text('PURCHASE ORDER', 105, 20, { align: 'center' })
-    
-    // PO Number and Date
-    doc.setFontSize(12)
-    doc.text(`PO Number: ${order.po_number}`, 20, 40)
-    doc.text(`Date: ${new Date(order.created_at).toLocaleDateString()}`, 20, 48)
-    doc.text(`Status: ${order.status.replace(/_/g, ' ').toUpperCase()}`, 20, 56)
-    
-    // Trade Terms
-    if (order.trade_terms) {
-      doc.text(`Trade Terms: ${order.trade_terms}`, 20, 64)
+    // Generate HTML content
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Purchase Order ${order.po_number}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    .header { text-align: center; margin-bottom: 40px; }
+    .header h1 { margin: 0; }
+    .info-section { display: flex; justify-content: space-between; margin-bottom: 40px; }
+    .info-box { width: 45%; }
+    .info-box h3 { margin-top: 0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    .totals { text-align: right; margin-top: 20px; }
+    .notes { margin-top: 40px; }
+    @media print {
+      body { margin: 0; }
     }
-    
-    // Seller Information
-    doc.setFontSize(14)
-    doc.text('FROM:', 20, 80)
-    doc.setFontSize(11)
-    doc.text(seller?.company_name || 'Company Name', 20, 88)
-    if (seller?.address) doc.text(seller.address, 20, 96)
-    if (seller?.email) doc.text(seller.email, 20, 104)
-    if (seller?.phone_number) doc.text(seller.phone_number, 20, 112)
-    
-    // Supplier Information
-    doc.setFontSize(14)
-    doc.text('TO:', 120, 80)
-    doc.setFontSize(11)
-    doc.text(supplier?.vendor_name || 'Unknown Supplier', 120, 88)
-    if (supplier?.address) doc.text(supplier.address, 120, 96)
-    if (supplier?.email) doc.text(supplier.email, 120, 104)
-    if (supplier?.contact_name) doc.text(`Contact: ${supplier.contact_name}`, 120, 112)
-    
-    // Items Table
-    const tableData = items?.map(item => [
-      item.product.sku,
-      item.product.product_name,
-      item.quantity.toString(),
-      item.product.unit_of_measure || 'units',
-      `$${item.unit_price.toFixed(2)}`,
-      `$${(item.quantity * item.unit_price).toFixed(2)}`
-    ]) || []
-    
-    doc.autoTable({
-      startY: 130,
-      head: [['SKU', 'Product', 'Qty', 'UOM', 'Unit Price', 'Total']],
-      body: tableData,
-      theme: 'striped',
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [66, 66, 66] }
-    })
-    
-    // Totals
-    const finalY = doc.lastAutoTable.finalY + 10
-    doc.text(`Subtotal: $${(order.subtotal || 0).toFixed(2)}`, 140, finalY)
-    doc.setFontSize(12)
-    doc.setFont(undefined, 'bold')
-    doc.text(`Total: $${(order.total_amount || 0).toFixed(2)}`, 140, finalY + 8)
-    
-    // Notes
-    if (order.notes) {
-      doc.setFont(undefined, 'normal')
-      doc.setFontSize(11)
-      doc.text('Notes:', 20, finalY + 20)
-      doc.setFontSize(10)
-      const splitNotes = doc.splitTextToSize(order.notes, 170)
-      doc.text(splitNotes, 20, finalY + 28)
-    }
-    
-    // Footer
-    doc.setFontSize(9)
-    doc.setTextColor(128)
-    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 105, 280, { align: 'center' })
-    
-    // Generate PDF buffer
-    const pdfBuffer = Buffer.from(doc.output('arraybuffer'))
-    
-    // Return PDF
-    return new NextResponse(pdfBuffer, {
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>PURCHASE ORDER</h1>
+    <p>PO Number: ${order.po_number}</p>
+    <p>Date: ${new Date(order.created_at).toLocaleDateString()}</p>
+    <p>Status: ${order.status.replace(/_/g, ' ').toUpperCase()}</p>
+    ${order.trade_terms ? `<p>Trade Terms: ${order.trade_terms}</p>` : ''}
+  </div>
+
+  <div class="info-section">
+    <div class="info-box">
+      <h3>FROM:</h3>
+      <p><strong>${seller?.company_name || 'Company Name'}</strong></p>
+      ${seller?.address ? `<p>${seller.address}</p>` : ''}
+      ${seller?.email ? `<p>${seller.email}</p>` : ''}
+      ${seller?.phone_number ? `<p>${seller.phone_number}</p>` : ''}
+    </div>
+    <div class="info-box">
+      <h3>TO:</h3>
+      <p><strong>${supplier?.vendor_name || 'Unknown Supplier'}</strong></p>
+      ${supplier?.address ? `<p>${supplier.address}</p>` : ''}
+      ${supplier?.email ? `<p>${supplier.email}</p>` : ''}
+      ${supplier?.contact_name ? `<p>Contact: ${supplier.contact_name}</p>` : ''}
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>SKU</th>
+        <th>Product</th>
+        <th>Quantity</th>
+        <th>UOM</th>
+        <th>Unit Price</th>
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${(items || []).map(item => `
+        <tr>
+          <td>${item.product.sku}</td>
+          <td>${item.product.product_name}</td>
+          <td>${item.quantity}</td>
+          <td>${item.product.unit_of_measure || 'units'}</td>
+          <td>$${item.unit_price.toFixed(2)}</td>
+          <td>$${(item.quantity * item.unit_price).toFixed(2)}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <p>Subtotal: $${(order.subtotal || 0).toFixed(2)}</p>
+    <p><strong>Total: $${(order.total_amount || 0).toFixed(2)}</strong></p>
+  </div>
+
+  ${order.notes ? `
+  <div class="notes">
+    <h3>Notes:</h3>
+    <p>${order.notes}</p>
+  </div>
+  ` : ''}
+
+  <div style="margin-top: 60px; text-align: center; color: #666;">
+    <p>Generated on ${new Date().toLocaleDateString()}</p>
+  </div>
+</body>
+</html>
+    `
+
+    // Return HTML with appropriate headers for download
+    return new NextResponse(html, {
       headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="PO-${order.po_number}.pdf"`
+        'Content-Type': 'text/html',
+        'Content-Disposition': `attachment; filename="PO-${order.po_number}.html"`
       }
     })
   } catch (error) {
