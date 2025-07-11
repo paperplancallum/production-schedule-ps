@@ -109,6 +109,7 @@ All tables use RLS policies to ensure:
 - Added default tier selection with star icon
 - Added primary supplier feature (cascades default price to product)
 - Changed Price Tiers column to show price range ($min - $max)
+- Added Primary Supplier column to products table
 
 ### 2025-01-10
 - Initial products implementation

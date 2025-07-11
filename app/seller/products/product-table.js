@@ -765,6 +765,20 @@ const columns = [
     ),
   },
   {
+    accessorKey: 'primary_supplier_name',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Primary Supplier" />
+    ),
+    cell: ({ row }) => {
+      const supplierName = row.getValue('primary_supplier_name')
+      return (
+        <div className="text-slate-600">
+          {supplierName || '-'}
+        </div>
+      )
+    },
+  },
+  {
     accessorKey: 'price',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Price" />
@@ -873,7 +887,15 @@ export function ProductTable() {
 
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          product_suppliers!left (
+            is_primary,
+            vendors (
+              vendor_name
+            )
+          )
+        `)
         .eq('seller_id', sellerData.id)
         .order('created_at', { ascending: false })
 
@@ -887,7 +909,13 @@ export function ProductTable() {
         throw error
       }
 
-      setProducts(data || [])
+      // Process data to include primary supplier name
+      const processedData = (data || []).map(product => ({
+        ...product,
+        primary_supplier_name: product.product_suppliers?.find(s => s.is_primary)?.vendors?.vendor_name || null
+      }))
+
+      setProducts(processedData)
     } catch (error) {
       console.error('Error fetching products:', error)
       // Don't show error toast for missing table
