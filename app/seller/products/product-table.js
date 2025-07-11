@@ -25,6 +25,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 // Component for the expanded row content
 function ProductSuppliers({ productId, productName }) {
@@ -211,65 +218,71 @@ function ProductSuppliers({ productId, productName }) {
       )}
 
       <Sheet open={isAddingSupplier} onOpenChange={setIsAddingSupplier}>
-        <SheetContent className="w-[400px] sm:w-[540px]">
+        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Add Supplier</SheetTitle>
             <SheetDescription>
               Add a supplier for {productName}
             </SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleAddSupplier} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="vendor">Vendor *</Label>
-              <select
-                id="vendor"
-                className="w-full rounded-md border border-input bg-background px-3 py-2"
-                value={newSupplier.vendor_id}
-                onChange={(e) => setNewSupplier({ ...newSupplier, vendor_id: e.target.value })}
-                required
-              >
-                <option value="">Select a vendor</option>
-                {vendors.map((vendor) => (
-                  <option key={vendor.id} value={vendor.id}>
-                    {vendor.vendor_name} ({vendor.vendor_type.replace('_', ' ')})
-                  </option>
-                ))}
-              </select>
+          <form onSubmit={handleAddSupplier} className="flex flex-col h-full">
+            <div className="space-y-4 px-6 pt-4 pb-4 flex-1 overflow-y-auto">
+              <div className="space-y-2">
+                <Label>Vendor *</Label>
+                <Select
+                  value={newSupplier.vendor_id}
+                  onValueChange={(value) => setNewSupplier({ ...newSupplier, vendor_id: value })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a vendor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vendors.map((vendor) => (
+                      <SelectItem key={vendor.id} value={vendor.id}>
+                        {vendor.vendor_name} ({vendor.vendor_type.replace('_', ' ')})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lead_time">Lead Time (days) *</Label>
+                <Input
+                  id="lead_time"
+                  type="number"
+                  value={newSupplier.lead_time_days}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, lead_time_days: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="min_order">Minimum Order Quantity *</Label>
+                <Input
+                  id="min_order"
+                  type="number"
+                  value={newSupplier.minimum_order_quantity}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, minimum_order_quantity: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="unit_price">Unit Price *</Label>
+                <Input
+                  id="unit_price"
+                  type="number"
+                  step="0.01"
+                  value={newSupplier.unit_price}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, unit_price: e.target.value })}
+                  required
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="lead_time">Lead Time (days) *</Label>
-              <Input
-                id="lead_time"
-                type="number"
-                value={newSupplier.lead_time_days}
-                onChange={(e) => setNewSupplier({ ...newSupplier, lead_time_days: e.target.value })}
-                required
-              />
+            <div className="px-6 py-4 border-t">
+              <Button type="submit" className="w-full">
+                Add Supplier
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="min_order">Minimum Order Quantity *</Label>
-              <Input
-                id="min_order"
-                type="number"
-                value={newSupplier.minimum_order_quantity}
-                onChange={(e) => setNewSupplier({ ...newSupplier, minimum_order_quantity: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="unit_price">Unit Price *</Label>
-              <Input
-                id="unit_price"
-                type="number"
-                step="0.01"
-                value={newSupplier.unit_price}
-                onChange={(e) => setNewSupplier({ ...newSupplier, unit_price: e.target.value })}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full">
-              Add Supplier
-            </Button>
           </form>
         </SheetContent>
       </Sheet>
