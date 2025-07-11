@@ -425,23 +425,25 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
               <CardContent>
                 <div className="space-y-3">
                   {order.status_history.map((history, index) => (
-                    <div key={history.id} className="flex items-start gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {history.from_status?.replace(/_/g, ' ') || 'Created'}
-                          </Badge>
-                          <span className="text-gray-500">→</span>
+                    <div key={history.id} className="border-l-2 border-gray-200 pl-4 pb-4 last:border-0">
+                      <div className="relative">
+                        <div className="absolute -left-6 top-0 w-3 h-3 bg-white border-2 border-gray-400 rounded-full"></div>
+                        <div className="flex items-center gap-2 mb-1">
                           <Badge variant={statusConfig[history.to_status]?.color} className="text-xs">
                             {statusConfig[history.to_status]?.label}
                           </Badge>
+                          {history.from_status && (
+                            <span className="text-xs text-gray-500">
+                              from {statusConfig[history.from_status]?.label || history.from_status.replace(/_/g, ' ')}
+                            </span>
+                          )}
                         </div>
+                        <p className="text-xs text-gray-500">
+                          {formatDateTime(history.created_at)}
+                        </p>
                         {history.notes && (
                           <p className="text-sm text-gray-600 mt-1">{history.notes}</p>
                         )}
-                        <p className="text-xs text-gray-500 mt-1">
-                          {formatDateTime(history.created_at)}
-                        </p>
                       </div>
                     </div>
                   ))}
