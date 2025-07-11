@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Plus, MoreHorizontal, RefreshCw, Eye, Calendar, CheckCircle, XCircle, Clock, AlertCircle, ChevronRight, ChevronDown, Building, Package, Trash2, Download } from 'lucide-react'
+import { Plus, MoreHorizontal, RefreshCw, Eye, Calendar, CheckCircle, XCircle, Clock, AlertCircle, ChevronRight, ChevronDown, Building, Package, Trash2, Download, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -303,6 +303,26 @@ export default function InspectionsPage() {
     } catch (error) {
       console.error('Error deleting inspection:', error)
       toast.error('Failed to delete inspection')
+    }
+  }
+
+  const handleDownloadPDF = async (inspection) => {
+    try {
+      await generateInspectionPDF(inspection)
+      toast.success('PDF downloaded successfully')
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      toast.error('Failed to generate PDF')
+    }
+  }
+
+  const handleSendInspectionRequest = async (inspection) => {
+    try {
+      // For now, just show a message. In the future, this could send emails
+      toast.info('Send functionality coming soon! For now, please download the PDF and send manually.')
+    } catch (error) {
+      console.error('Error sending inspection request:', error)
+      toast.error('Failed to send inspection request')
     }
   }
 
@@ -731,22 +751,46 @@ export default function InspectionsPage() {
                         <TableCell colSpan={8} className="bg-transparent p-4">
                           <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm p-8">
                             {/* Header Section */}
-                            <div className="mb-6 flex justify-between items-start">
-                              <div>
-                                <h3 className="text-lg font-semibold mb-2">Inspection Schedule</h3>
-                                <div className="text-sm text-muted-foreground space-y-1">
-                                  <div>Scheduled: {inspection.scheduled_date ? new Date(inspection.scheduled_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '-'}</div>
-                                  <div>Status: <Badge variant={statusConfig[inspection.status]?.color} className="ml-1">
-                                    {statusConfig[inspection.status]?.label}
-                                  </Badge></div>
+                            <div className="mb-6">
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <h3 className="text-lg font-semibold mb-2">Inspection Schedule</h3>
+                                  <div className="text-sm text-muted-foreground space-y-1">
+                                    <div>Scheduled: {inspection.scheduled_date ? new Date(inspection.scheduled_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '-'}</div>
+                                    <div>Status: <Badge variant={statusConfig[inspection.status]?.color} className="ml-1">
+                                      {statusConfig[inspection.status]?.label}
+                                    </Badge></div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-sm text-muted-foreground mb-1">Inspection Agency</div>
+                                  <div className="font-medium">{inspection.inspection_agent?.vendor_name || '-'}</div>
+                                  {inspection.inspection_agent?.contact_name && (
+                                    <div className="text-sm text-muted-foreground">{inspection.inspection_agent.contact_name}</div>
+                                  )}
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="text-sm text-muted-foreground mb-1">Inspection Agency</div>
-                                <div className="font-medium">{inspection.inspection_agent?.vendor_name || '-'}</div>
-                                {inspection.inspection_agent?.contact_name && (
-                                  <div className="text-sm text-muted-foreground">{inspection.inspection_agent.contact_name}</div>
-                                )}
+                              
+                              {/* Action Buttons */}
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDownloadPDF(inspection)}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Download className="h-4 w-4" />
+                                  Download PDF
+                                </Button>
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => handleSendInspectionRequest(inspection)}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Send className="h-4 w-4" />
+                                  Send Inspection Request
+                                </Button>
                               </div>
                             </div>
 
