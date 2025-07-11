@@ -51,7 +51,13 @@ export default async function VendorProductsPage() {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching vendor products:', error)
+    console.error('Error fetching vendor products:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      fullError: JSON.stringify(error, null, 2)
+    })
     rlsError = error
   } else {
     products = data || []
@@ -78,7 +84,24 @@ export default async function VendorProductsPage() {
       .select('*')
       .in('id', productIds)
     
-    console.log('Direct products query:', { data: directProducts, error: directError })
+    console.log('Direct products query:', { 
+      data: directProducts, 
+      error: directError,
+      productIds: productIds,
+      errorDetails: directError ? JSON.stringify(directError, null, 2) : null
+    })
+    
+    // If direct query works, manually combine the data
+    if (directProducts && directProducts.length > 0) {
+      console.log('✅ Direct product query works! Manually combining data...')
+      products = directProducts.map(product => {
+        const supplierInfo = supplierEntries.find(ps => ps.product_id === product.id)
+        return {
+          ...product,
+          product_suppliers: [supplierInfo]
+        }
+      })
+    }
   }
   
   // Also check without any filters to see if we can access the table at all
