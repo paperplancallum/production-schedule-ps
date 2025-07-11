@@ -178,6 +178,34 @@ export default function TransfersPage() {
     setStats(stats)
   }
 
+  const getNextTransferNumber = async (count = 1) => {
+    try {
+      const response = await fetch('/api/transfers')
+      const data = await response.json()
+      
+      if (response.ok && data.length > 0) {
+        // Extract numbers from existing transfers
+        const numbers = data
+          .map(t => {
+            const match = t.transfer_number.match(/TR-(\d+)/)
+            return match ? parseInt(match[1]) : 0
+          })
+          .filter(n => n > 0)
+        
+        // Find the highest number
+        const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 1000
+        return maxNumber + 1
+      }
+      
+      // Start from 1001 if no transfers exist
+      return 1001
+    } catch (error) {
+      console.error('Error getting next transfer number:', error)
+      // Fallback to timestamp-based number if error
+      return 1000 + Math.floor(Math.random() * 1000)
+    }
+  }
+
   const loadPurchaseOrderData = async (poNumber) => {
     try {
       // Fetch PO data
@@ -244,8 +272,12 @@ export default function TransfersPage() {
       let successCount = 0
       let totalQuantity = 0
       
-      for (const item of (poData.items || [])) {
-        const transferNumber = `TRF-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
+      // Get the next transfer number
+      const startNumber = await getNextTransferNumber(poData.items.length)
+      
+      for (let i = 0; i < (poData.items || []).length; i++) {
+        const item = poData.items[i]
+        const transferNumber = `TR-${startNumber + i}`
         
         const transferData = {
           transfer_number: transferNumber,
@@ -344,50 +376,81 @@ export default function TransfersPage() {
   const handleCreateTransfer = async (e) => {
     e.preventDefault()
     try {
-      // Generate transfer number
-      const transferNumber = `TRF-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
-      
-      // Create the new transfer
-      const newTransfer = {
-        transfer_number: transferNumber,
-        transfer_type: formData.transfer_type,
-        purchase_order_number: formData.purchase_order_id,
-        from_location: formData.from_location,
-        from_location_type: formData.from_location_type,
-        to_location: formData.to_location,
-        to_location_type: formData.to_location_type,
-        status: 'pending',
-        estimated_arrival: formData.estimated_arrival ? new Date(formData.estimated_arrival).toISOString() : null,
-        tracking_number: formData.tracking_number || null,
-        carrier: formData.carrier || null,
-        notes: formData.notes || null,
-        items: formData.items || []
-      }
-      
-      // Save to database
-      const response = await fetch('/api/transfers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newTransfer)
-      })
+      // If there are multiple items, create separate transfers (ledger style)
+      if (formData.items && formData.items.length > 1) {
+        const startNumber = await getNextTransferNumber(formData.items.length)
+        let successCount = 0
+        
+        for (let i = 0; i < formData.items.length; i++) {
+          const item = formData.items[i]
+          const transferNumber = `TR-${startNumber + i}`
+          
+          const newTransfer = {
+            transfer_number: transferNumber,
+            transfer_type: formData.transfer_type,
+            purchase_order_number: formData.purchase_order_id,
+            from_location: formData.from_location,
+            from_location_type: formData.from_location_type,
+            to_location: formData.to_location,
+            to_location_type: formData.to_location_type,
+            status: 'pending',
+            estimated_arrival: formData.estimated_arrival ? new Date(formData.estimated_arrival).toISOString() : null,
+            tracking_number: formData.tracking_number || null,
+            carrier: formData.carrier || null,
+            notes: `${formData.notes || ''} - ${item.sku}`.trim(),
+            items: [item]
+          }
+          
+          const response = await fetch('/api/transfers', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(newTransfer)
+          })
+          
+          if (response.ok) {
+            successCount++
+          }
+        }
+        
+        toast.success(`Created ${successCount} transfers successfully`)
+      } else {
+        // Single item transfer
+        const nextNumber = await getNextTransferNumber()
+        const transferNumber = `TR-${nextNumber}`
+        
+        const newTransfer = {
+          transfer_number: transferNumber,
+          transfer_type: formData.transfer_type,
+          purchase_order_number: formData.purchase_order_id,
+          from_location: formData.from_location,
+          from_location_type: formData.from_location_type,
+          to_location: formData.to_location,
+          to_location_type: formData.to_location_type,
+          status: 'pending',
+          estimated_arrival: formData.estimated_arrival ? new Date(formData.estimated_arrival).toISOString() : null,
+          tracking_number: formData.tracking_number || null,
+          carrier: formData.carrier || null,
+          notes: formData.notes || null,
+          items: formData.items || []
+        }
+        
+        const response = await fetch('/api/transfers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newTransfer)
+        })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create transfer')
-      }
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to create transfer')
+        }
 
-      const createdTransfer = await response.json()
-      
-      const itemCount = formData.items?.length || 0
-      const totalQuantity = formData.items?.reduce((sum, item) => sum + item.quantity, 0) || 0
-      
-      toast.success(
-        `Transfer ${transferNumber} created successfully${
-          itemCount > 0 ? ` with ${itemCount} items (${totalQuantity} units)` : ''
-        }`
-      )
+        toast.success(`Transfer ${transferNumber} created successfully`)
+      }
       
       // Reset form and close dialog
       setFormData({
