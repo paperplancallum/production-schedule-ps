@@ -23,6 +23,8 @@ export async function GET(request) {
     // Filter by vendor if provided
     if (vendorId) {
       query = query.eq('supplier_id', vendorId)
+      // Vendors should not see draft POs
+      query = query.neq('status', 'draft')
     }
 
     // Filter by status if provided

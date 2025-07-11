@@ -30,6 +30,7 @@ export default async function VendorPurchaseOrderPage({ params }) {
     .select('*')
     .eq('id', id)
     .eq('supplier_id', vendor.id)
+    .neq('status', 'draft')  // Vendors cannot see draft POs
     .single()
 
   if (error || !order) {
