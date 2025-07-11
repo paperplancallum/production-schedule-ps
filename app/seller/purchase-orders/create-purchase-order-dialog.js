@@ -24,7 +24,8 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
   // Form state
   const [formData, setFormData] = useState({
     supplier_id: defaultSupplierId || '',
-    notes: ''
+    notes: '',
+    trade_terms: 'FOB' // Default trade term
   })
   
   // Items state
@@ -490,6 +491,27 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
                 Total: ${calculateSubtotal().toFixed(2)}
               </div>
             </div>
+          </div>
+
+          {/* Trade Terms */}
+          <div className="space-y-2">
+            <Label htmlFor="trade_terms">Trade Terms</Label>
+            <Select
+              value={formData.trade_terms}
+              onValueChange={(value) => setFormData({ ...formData, trade_terms: value })}
+            >
+              <SelectTrigger id="trade_terms">
+                <SelectValue placeholder="Select trade terms" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="FOB">FOB (Free On Board)</SelectItem>
+                <SelectItem value="CIF">CIF (Cost, Insurance & Freight)</SelectItem>
+                <SelectItem value="EXW">EXW (Ex Works)</SelectItem>
+                <SelectItem value="DDP">DDP (Delivered Duty Paid)</SelectItem>
+                <SelectItem value="FCA">FCA (Free Carrier)</SelectItem>
+                <SelectItem value="CFR">CFR (Cost and Freight)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Notes */}

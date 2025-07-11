@@ -19,7 +19,7 @@ import {
   Edit,
   Save,
   X,
-  Printer,
+  Download,
   Mail
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -130,14 +130,45 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
 
   const getAvailableTransitions = () => {
     const transitions = {
-      'draft': ['cancelled'], // Removed 'sent_to_supplier' - will be done via email
-      'sent_to_supplier': ['approved', 'cancelled'], // Supplier confirms from their dashboard
-      'approved': ['in_progress', 'cancelled'],
-      'in_progress': ['complete', 'cancelled'],
+      'draft': [], // Removed 'sent_to_supplier' - will be done via email
+      'sent_to_supplier': ['approved'], // Supplier confirms from their dashboard
+      'approved': ['in_progress'],
+      'in_progress': ['complete'],
       'complete': [],
       'cancelled': []
     }
     return transitions[order.status] || []
+  }
+
+  const canBeCancelled = () => {
+    const cancellableStatuses = ['draft', 'sent_to_supplier', 'approved', 'in_progress']
+    return cancellableStatuses.includes(order.status)
+  }
+
+  const handleDownloadPDF = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/purchase-orders/${order.id}/pdf`)
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `PO-${order.po_number}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      } else {
+        console.error('Error downloading PDF')
+        alert('Failed to download PDF')
+      }
+    } catch (error) {
+      console.error('Error downloading PDF:', error)
+      alert('Failed to download PDF')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -185,9 +216,9 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
                 </Button>
               </>
             )}
-            <Button variant="outline" onClick={() => window.print()}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print
+            <Button variant="outline" onClick={handleDownloadPDF} disabled={loading}>
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
             </Button>
             <Button variant="outline" onClick={() => {}}>
               <Mail className="h-4 w-4 mr-2" />
@@ -250,6 +281,33 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
                 <div className="flex justify-end gap-4 text-lg font-semibold pt-2 border-t">
                   <span>Total:</span>
                   <span>{formatCurrency(order.total_amount)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Order Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Order Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-gray-500">PO Number</Label>
+                  <p className="font-medium">{order.po_number}</p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-500">Order Date</Label>
+                  <p className="font-medium">{formatDate(order.created_at)}</p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-500">Trade Terms</Label>
+                  <p className="font-medium">{order.trade_terms || 'FOB'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-500">Requested Delivery</Label>
+                  <p className="font-medium">{formatDate(order.requested_delivery_date) || 'Not specified'}</p>
                 </div>
               </div>
             </CardContent>
@@ -374,6 +432,29 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
                     ))}
                   </SelectContent>
                 </Select>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Cancel Order */}
+          {canBeCancelled() && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Cancel Order</CardTitle>
+                <CardDescription>
+                  This action cannot be undone
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleStatusUpdate('cancelled')}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Cancel Purchase Order
+                </Button>
               </CardContent>
             </Card>
           )}
