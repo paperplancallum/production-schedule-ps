@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS public.supplier_price_tiers (
     product_supplier_id UUID NOT NULL REFERENCES public.product_suppliers(id) ON DELETE CASCADE,
     minimum_order_quantity INTEGER NOT NULL,
     unit_price DECIMAL(10, 2) NOT NULL,
+    is_default BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

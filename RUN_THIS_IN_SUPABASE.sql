@@ -7,9 +7,21 @@ CREATE TABLE IF NOT EXISTS public.supplier_price_tiers (
     product_supplier_id UUID NOT NULL REFERENCES public.product_suppliers(id) ON DELETE CASCADE,
     minimum_order_quantity INTEGER NOT NULL,
     unit_price DECIMAL(10, 2) NOT NULL,
+    is_default BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Add is_default column if table already exists but column doesn't
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_schema = 'public' 
+                   AND table_name = 'supplier_price_tiers' 
+                   AND column_name = 'is_default') THEN
+        ALTER TABLE public.supplier_price_tiers ADD COLUMN is_default BOOLEAN DEFAULT false;
+    END IF;
+END $$;
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_supplier_price_tiers_product_supplier_id ON public.supplier_price_tiers(product_supplier_id);

@@ -17,14 +17,14 @@ export default async function VendorDetailPage({ params }) {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">
-        {vendor.company_name} Overview
+        {vendor.vendor_name} Overview
       </h1>
       
       <div className="bg-white shadow rounded-lg p-6">
         <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
           <div>
-            <dt className="text-sm font-medium text-gray-500">Company Name</dt>
-            <dd className="mt-1 text-sm text-gray-900">{vendor.company_name}</dd>
+            <dt className="text-sm font-medium text-gray-500">Vendor Name</dt>
+            <dd className="mt-1 text-sm text-gray-900">{vendor.vendor_name}</dd>
           </div>
           
           <div>
@@ -43,19 +43,28 @@ export default async function VendorDetailPage({ params }) {
           </div>
           
           <div>
-            <dt className="text-sm font-medium text-gray-500">Phone</dt>
-            <dd className="mt-1 text-sm text-gray-900">{vendor.phone || 'Not provided'}</dd>
+            <dt className="text-sm font-medium text-gray-500">Country</dt>
+            <dd className="mt-1 text-sm text-gray-900">{vendor.country || 'Not provided'}</dd>
+          </div>
+          
+          <div>
+            <dt className="text-sm font-medium text-gray-500">Address</dt>
+            <dd className="mt-1 text-sm text-gray-900">{vendor.address || 'Not provided'}</dd>
           </div>
           
           <div>
             <dt className="text-sm font-medium text-gray-500">Status</dt>
             <dd className="mt-1">
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                vendor.status === 'active' 
+                vendor.vendor_status === 'accepted' 
                   ? 'bg-green-100 text-green-800' 
+                  : vendor.vendor_status === 'invited'
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : vendor.vendor_status === 'archived'
+                  ? 'bg-red-100 text-red-800'
                   : 'bg-gray-100 text-gray-800'
               }`}>
-                {vendor.status}
+                {vendor.vendor_status || 'draft'}
               </span>
             </dd>
           </div>

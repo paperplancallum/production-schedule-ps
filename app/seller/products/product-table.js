@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, MoreHorizontal, RefreshCw, Pencil, Trash2, ChevronDown, ChevronRight, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Select,
@@ -42,7 +42,7 @@ function ProductSuppliers({ productId, productName }) {
   const [newSupplier, setNewSupplier] = useState({
     vendor_id: '',
     lead_time_days: '',
-    price_tiers: [{ minimum_order_quantity: '', unit_price: '' }],
+    price_tiers: [{ minimum_order_quantity: '', unit_price: '', is_default: true }],
   })
   const [vendors, setVendors] = useState([])
   const [expandedSuppliers, setExpandedSuppliers] = useState({})
@@ -73,7 +73,8 @@ function ProductSuppliers({ productId, productName }) {
           supplier_price_tiers (
             id,
             minimum_order_quantity,
-            unit_price
+            unit_price,
+            is_default
           )
         `)
         .eq('product_id', productId)
@@ -194,12 +195,19 @@ function ProductSuppliers({ productId, productName }) {
         throw supplierError
       }
 
-      // Try to add price tiers
-      const tierData = validTiers.map(tier => ({
+      // Try to add price tiers - ensure only one is default
+      const tierData = validTiers.map((tier, index) => ({
         product_supplier_id: supplierResult.id,
         minimum_order_quantity: parseInt(tier.minimum_order_quantity),
         unit_price: parseFloat(tier.unit_price),
+        is_default: tier.is_default === true
       }))
+      
+      // Ensure at least one tier is default
+      const hasDefault = tierData.some(t => t.is_default)
+      if (!hasDefault && tierData.length > 0) {
+        tierData[0].is_default = true
+      }
 
       const { error: tierError } = await supabase
         .from('supplier_price_tiers')
@@ -224,7 +232,7 @@ function ProductSuppliers({ productId, productName }) {
       setNewSupplier({
         vendor_id: '',
         lead_time_days: '',
-        price_tiers: [{ minimum_order_quantity: '', unit_price: '' }],
+        price_tiers: [{ minimum_order_quantity: '', unit_price: '', is_default: true }],
       })
       fetchSuppliers()
     } catch (error) {
@@ -242,9 +250,10 @@ function ProductSuppliers({ productId, productName }) {
         ? supplier.supplier_price_tiers.map(tier => ({
             id: tier.id,
             minimum_order_quantity: tier.minimum_order_quantity.toString(),
-            unit_price: tier.unit_price.toString()
+            unit_price: tier.unit_price.toString(),
+            is_default: tier.is_default || false
           }))
-        : [{ minimum_order_quantity: '', unit_price: '' }]
+        : [{ minimum_order_quantity: '', unit_price: '', is_default: true }]
     })
     setIsAddingSupplier(true)
   }
@@ -295,12 +304,19 @@ function ProductSuppliers({ productId, productName }) {
             .eq('product_supplier_id', editingSupplier.id)
         }
 
-        // Add new tiers
-        const tierData = validTiers.map(tier => ({
+        // Add new tiers - ensure only one is default
+        const tierData = validTiers.map((tier, index) => ({
           product_supplier_id: editingSupplier.id,
           minimum_order_quantity: parseInt(tier.minimum_order_quantity),
           unit_price: parseFloat(tier.unit_price),
+          is_default: tier.is_default === true
         }))
+        
+        // Ensure at least one tier is default
+        const hasDefault = tierData.some(t => t.is_default)
+        if (!hasDefault && tierData.length > 0) {
+          tierData[0].is_default = true
+        }
 
         const { error: tierError } = await supabase
           .from('supplier_price_tiers')
@@ -317,7 +333,7 @@ function ProductSuppliers({ productId, productName }) {
       setNewSupplier({
         vendor_id: '',
         lead_time_days: '',
-        price_tiers: [{ minimum_order_quantity: '', unit_price: '' }],
+        price_tiers: [{ minimum_order_quantity: '', unit_price: '', is_default: true }],
       })
       fetchSuppliers()
     } catch (error) {
@@ -431,6 +447,9 @@ function ProductSuppliers({ productId, productName }) {
                             <div className="space-y-1">
                               {supplier.supplier_price_tiers.map((tier, tierIndex) => (
                                 <div key={tier.id} className="flex items-center gap-4 text-sm">
+                                  {tier.is_default && (
+                                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" title="Default tier" />
+                                  )}
                                   <span className="text-slate-600">MOQ: {tier.minimum_order_quantity}</span>
                                   <span className="text-slate-900 font-medium">${parseFloat(tier.unit_price).toFixed(2)}/unit</span>
                                 </div>
@@ -523,7 +542,7 @@ function ProductSuppliers({ productId, productName }) {
                     onClick={() => {
                       setNewSupplier({
                         ...newSupplier,
-                        price_tiers: [...newSupplier.price_tiers, { minimum_order_quantity: '', unit_price: '' }]
+                        price_tiers: [...newSupplier.price_tiers, { minimum_order_quantity: '', unit_price: '', is_default: false }]
                       })
                     }}
                   >
@@ -534,6 +553,22 @@ function ProductSuppliers({ productId, productName }) {
                 <div className="space-y-2">
                   {newSupplier.price_tiers.map((tier, index) => (
                     <div key={index} className="flex gap-2 items-start">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const newTiers = newSupplier.price_tiers.map((t, i) => ({
+                            ...t,
+                            is_default: i === index
+                          }))
+                          setNewSupplier({ ...newSupplier, price_tiers: newTiers })
+                        }}
+                        className="h-9 w-9 p-0"
+                        title="Set as default tier"
+                      >
+                        <Star className={`h-4 w-4 ${tier.is_default ? 'fill-yellow-400 text-yellow-400' : 'text-slate-400'}`} />
+                      </Button>
                       <div className="flex-1">
                         <Input
                           type="number"
@@ -568,6 +603,10 @@ function ProductSuppliers({ productId, productName }) {
                           size="sm"
                           onClick={() => {
                             const newTiers = newSupplier.price_tiers.filter((_, i) => i !== index)
+                            // If we're removing the default tier, make the first one default
+                            if (tier.is_default && newTiers.length > 0) {
+                              newTiers[0].is_default = true
+                            }
                             setNewSupplier({ ...newSupplier, price_tiers: newTiers })
                           }}
                           className="h-9 w-9 p-0"

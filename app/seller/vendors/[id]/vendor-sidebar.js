@@ -87,8 +87,8 @@ export default function VendorSidebar({ vendor }) {
     <aside className="w-64 bg-gray-50 border-r border-gray-200 min-h-screen">
       <div className="p-6">
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">{vendor.company_name}</h2>
-          <p className="text-sm text-gray-500 capitalize">{vendor.vendor_type}</p>
+          <h2 className="text-lg font-semibold text-gray-900">{vendor.vendor_name}</h2>
+          <p className="text-sm text-gray-500 capitalize">{vendor.vendor_type.replace('_', ' ')}</p>
         </div>
         
         <nav className="space-y-1">

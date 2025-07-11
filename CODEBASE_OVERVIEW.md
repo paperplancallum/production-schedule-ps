@@ -44,6 +44,7 @@ This is a Next.js application for managing production schedules, vendors, and pr
 - **Tiered Pricing**:
   - Each supplier can have multiple price tiers
   - Each tier has: Minimum Order Quantity (MOQ) and Unit Price
+  - Star one tier as default per supplier
   - Expandable view shows all price tiers for each supplier
   - Edit suppliers to update lead time and price tiers
 - Junction table: `product_suppliers` links products to vendors
@@ -100,6 +101,7 @@ All tables use RLS policies to ensure:
 - Prevented duplicate suppliers per product (filters dropdown)
 - Added tiered pricing for suppliers with MOQ-based price breaks
 - Added edit functionality for suppliers (lead time & price tiers)
+- Added default tier selection with star icon
 
 ### 2025-01-10
 - Initial products implementation
