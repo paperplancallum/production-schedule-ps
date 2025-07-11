@@ -14,8 +14,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { MoreHorizontal, RefreshCw, ChevronDown, ChevronRight, FileText } from 'lucide-react'
+import { MoreHorizontal, RefreshCw, ChevronDown, ChevronRight, FileText, Filter } from 'lucide-react'
 import { toast } from 'sonner'
+import SupplierFilters from './supplier-filters'
 
 // Component for the expanded row content in supplier view
 function SupplierProducts({ supplierId, supplierName, onCreatePO }) {
@@ -267,13 +268,19 @@ const supplierColumns = [
 
 export function SupplierTable() {
   const [suppliers, setSuppliers] = useState([])
+  const [filteredSuppliers, setFilteredSuppliers] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedRows, setSelectedRows] = useState({})
+  const [filters, setFilters] = useState([])
   const supabase = createClient()
 
   useEffect(() => {
     fetchSuppliers()
   }, [])
+
+  useEffect(() => {
+    applyFilters()
+  }, [suppliers, filters])
 
   const fetchSuppliers = async () => {
     try {
@@ -349,12 +356,116 @@ export function SupplierTable() {
         .sort((a, b) => b.product_count - a.product_count)
 
       setSuppliers(suppliersArray)
+      setFilteredSuppliers(suppliersArray)
     } catch (error) {
       console.error('Error fetching suppliers:', error)
       toast.error('Failed to fetch suppliers')
     } finally {
       setLoading(false)
     }
+  }
+
+  const applyFilters = () => {
+    if (!filters || (filters.filters && filters.filters.length === 0)) {
+      setFilteredSuppliers(suppliers)
+      return
+    }
+
+    // Handle both old format (array) and new format (object with filters and logic)
+    const filterConditions = Array.isArray(filters) ? filters : (filters.filters || [])
+    const logicOperator = filters.logic || 'and'
+
+    const filtered = suppliers.filter(supplier => {
+      // Check if supplier matches conditions based on logic operator
+      const checkCondition = (condition) => {
+        if (!condition.field || !condition.operator) return true
+
+        const value = supplier[condition.field]
+        const filterValue = condition.value
+
+        // Handle date fields differently
+        if (condition.field === 'created_at') {
+          const dateValue = value ? new Date(value) : null
+          const filterDate = filterValue ? new Date(filterValue) : null
+          
+          if (!dateValue) return condition.operator === 'is_empty'
+          if (!filterDate && condition.operator !== 'is_empty' && condition.operator !== 'is_not_empty') return true
+          
+          // For date equality, compare only the date part (ignore time)
+          const getDateOnly = (date) => {
+            const d = new Date(date)
+            d.setHours(0, 0, 0, 0)
+            return d
+          }
+          
+          switch (condition.operator) {
+            case 'equals':
+              return getDateOnly(dateValue).getTime() === getDateOnly(filterDate).getTime()
+            case 'not_equals':
+              return getDateOnly(dateValue).getTime() !== getDateOnly(filterDate).getTime()
+            case 'greater_than':
+              return dateValue > filterDate
+            case 'less_than':
+              return dateValue < filterDate
+            case 'greater_or_equal':
+              return dateValue >= filterDate
+            case 'less_or_equal':
+              return dateValue <= filterDate
+            case 'is_empty':
+              return !value
+            case 'is_not_empty':
+              return !!value
+            default:
+              return true
+          }
+        }
+        
+        // Handle other fields
+        switch (condition.operator) {
+          case 'contains':
+            return value && value.toString().toLowerCase().includes(filterValue.toLowerCase())
+          case 'not_contains':
+            return !value || !value.toString().toLowerCase().includes(filterValue.toLowerCase())
+          case 'equals':
+            return value === filterValue
+          case 'not_equals':
+            return value !== filterValue
+          case 'starts_with':
+            return value && value.toString().toLowerCase().startsWith(filterValue.toLowerCase())
+          case 'ends_with':
+            return value && value.toString().toLowerCase().endsWith(filterValue.toLowerCase())
+          case 'is_empty':
+            return !value || value === ''
+          case 'is_not_empty':
+            return value && value !== ''
+          case 'is_any_of':
+            if (Array.isArray(filterValue)) {
+              return filterValue.some(v => 
+                value && value.toString().toLowerCase() === v.toLowerCase()
+              )
+            }
+            return false
+          case 'is_none_of':
+            if (Array.isArray(filterValue)) {
+              return !filterValue.some(v => 
+                value && value.toString().toLowerCase() === v.toLowerCase()
+              )
+            }
+            return true
+          default:
+            return true
+        }
+      }
+      
+      // Apply logic operator (AND or OR)
+      if (logicOperator === 'or') {
+        return filterConditions.some(checkCondition)
+      } else {
+        return filterConditions.every(checkCondition)
+      }
+    })
+
+    setFilteredSuppliers(filtered)
   }
 
   const handleCreatePO = (productIds, supplierName) => {
@@ -371,6 +482,10 @@ export function SupplierTable() {
 
   return (
     <div>
+      <SupplierFilters 
+        onFiltersChange={setFilters}
+      />
+      
       <div className="flex justify-end mb-4">
         <Button
           variant="outline"
@@ -394,8 +509,7 @@ export function SupplierTable() {
       ) : (
         <DataTable
           columns={supplierColumns}
-          data={suppliers}
-          searchKey="vendor_name"
+          data={filteredSuppliers}
           renderSubComponent={({ row }) => (
             <SupplierProducts
               supplierId={row.original.id}
