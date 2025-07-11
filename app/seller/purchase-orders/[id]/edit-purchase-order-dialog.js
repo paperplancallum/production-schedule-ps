@@ -32,14 +32,17 @@ export default function EditPurchaseOrderDialog({
         trade_terms: order.trade_terms || 'FOB',
         items: order.items?.map(item => ({
           id: item.id,
-          product_id: item.product_id,
-          product_supplier_id: item.product_supplier_id,
-          price_tier_id: item.price_tier_id,
+          product_id: item.product_id || item.product?.id,
+          product_supplier_id: item.product_supplier_id || item.product_supplier?.id,
+          price_tier_id: item.price_tier_id || item.price_tier?.id,
           quantity: item.quantity,
           unit_price: item.unit_price,
           product: item.product,
           product_supplier: item.product_supplier,
-          price_tier: item.price_tier
+          price_tier: item.price_tier,
+          // For display purposes
+          sku: item.product?.sku,
+          product_name: item.product?.product_name
         })) || []
       })
       fetchProducts()
@@ -47,6 +50,8 @@ export default function EditPurchaseOrderDialog({
   }, [order, open])
 
   const fetchProducts = async () => {
+    if (!order?.supplier_id) return
+    
     try {
       const response = await fetch(`/api/products/supplier/${order.supplier_id}`)
       if (response.ok) {
@@ -98,11 +103,16 @@ export default function EditPurchaseOrderDialog({
           unit_price: defaultTier?.unit_price || 0,
           product: product,
           product_supplier: productSupplier,
-          price_tier: defaultTier
+          price_tier: defaultTier,
+          sku: product.sku,
+          product_name: product.product_name
         }
       }
     } else if (field === 'price_tier_id') {
-      const tier = newItems[index].product_supplier?.price_tiers?.find(t => t.id === value)
+      const productSupplier = newItems[index].product_supplier || 
+        products.find(p => p.id === newItems[index].product_id)?.product_suppliers?.find(ps => ps.vendor_id === order.supplier_id)
+      
+      const tier = productSupplier?.price_tiers?.find(t => t.id === value)
       if (tier) {
         newItems[index] = {
           ...newItems[index],
@@ -186,6 +196,18 @@ export default function EditPurchaseOrderDialog({
     return formData.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
   }
 
+  const getPriceTiers = (item) => {
+    // Try to get price tiers from the item's product_supplier
+    if (item.product_supplier?.price_tiers) {
+      return item.product_supplier.price_tiers
+    }
+    
+    // Otherwise, find the product and get its supplier's price tiers
+    const product = products.find(p => p.id === item.product_id)
+    const productSupplier = product?.product_suppliers?.find(ps => ps.vendor_id === order.supplier_id)
+    return productSupplier?.price_tiers || []
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -240,7 +262,9 @@ export default function EditPurchaseOrderDialog({
                           onValueChange={(value) => handleItemChange(index, 'product_id', value)}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select product" />
+                            <SelectValue placeholder="Select product">
+                              {item.sku && item.product_name ? `${item.sku} - ${item.product_name}` : 'Select product'}
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             {products.map(product => {
@@ -250,6 +274,7 @@ export default function EditPurchaseOrderDialog({
                               return (
                                 <SelectItem key={product.id} value={product.id}>
                                   {product.sku} - {product.product_name}
+                                  {productSupplier.moq && ` (MOQ: ${productSupplier.moq})`}
                                 </SelectItem>
                               )
                             })}
@@ -263,13 +288,13 @@ export default function EditPurchaseOrderDialog({
                         <Select
                           value={item.price_tier_id}
                           onValueChange={(value) => handleItemChange(index, 'price_tier_id', value)}
-                          disabled={!item.product_supplier_id}
+                          disabled={!item.product_id}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select price tier" />
                           </SelectTrigger>
                           <SelectContent>
-                            {item.product_supplier?.price_tiers?.map(tier => (
+                            {getPriceTiers(item).map(tier => (
                               <SelectItem key={tier.id} value={tier.id}>
                                 {tier.minimum_order_quantity}+ units @ {formatCurrency(tier.unit_price)}
                               </SelectItem>
@@ -320,6 +345,12 @@ export default function EditPurchaseOrderDialog({
                   </div>
                 </div>
               ))}
+
+              {formData.items.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No items added yet. Click "Add Item" to add products to this order.
+                </div>
+              )}
             </div>
           </div>
 
