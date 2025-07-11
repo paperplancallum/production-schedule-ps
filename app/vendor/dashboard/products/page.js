@@ -112,11 +112,11 @@ export default async function VendorProductsPage() {
           </p>
         </div>
         
-        {error && error.message?.includes('product_suppliers') && (
-          <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              The product suppliers relationship table is not set up yet. 
-              Showing all products for now.
+        {psError && psError.message?.includes('infinite recursion') && (
+          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              There is a database policy issue preventing products from being displayed. 
+              Please contact your administrator to fix the RLS policies.
             </p>
           </div>
         )}
