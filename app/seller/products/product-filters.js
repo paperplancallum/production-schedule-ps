@@ -19,7 +19,7 @@ import {
 const FIELD_OPTIONS = [
   { value: 'product_name', label: 'Product Name', type: 'text' },
   { value: 'sku', label: 'Internal SKU', type: 'text' },
-  { value: 'primary_supplier_name', label: 'Primary Supplier', type: 'text' },
+  { value: 'primary_supplier_name', label: 'Primary Supplier', type: 'select' },
   { value: 'price', label: 'Price', type: 'number' },
   { value: 'supplier_moq', label: 'MOQ', type: 'number' },
   { value: 'created_at', label: 'Created Date', type: 'date' },
@@ -71,21 +71,20 @@ export default function ProductFilters({ onFiltersChange, suppliers = [] }) {
     { id: 'cond-1', field: '', operator: '', value: '' }
   ])
   const [isOpen, setIsOpen] = useState(false)
+  const [logicOperator, setLogicOperator] = useState('and')
 
   // Update the field options to include dynamic supplier options
   const getFieldOptions = () => {
-    const baseOptions = [...FIELD_OPTIONS]
-    
-    // Add supplier-specific options if suppliers are available
-    if (suppliers.length > 0) {
-      const supplierOption = {
-        value: 'supplier',
-        label: 'Supplier',
-        type: 'select',
-        options: suppliers.map(s => ({ value: s.id, label: s.vendor_name }))
+    const baseOptions = [...FIELD_OPTIONS].map(field => {
+      // Add supplier options to the primary_supplier_name field
+      if (field.value === 'primary_supplier_name' && suppliers.length > 0) {
+        return {
+          ...field,
+          options: suppliers.map(s => ({ value: s.vendor_name, label: s.vendor_name }))
+        }
       }
-      baseOptions.push(supplierOption)
-    }
+      return field
+    })
     
     return baseOptions
   }
@@ -130,8 +129,8 @@ export default function ProductFilters({ onFiltersChange, suppliers = [] }) {
       (c.operator === 'is_empty' || c.operator === 'is_not_empty' || c.value)
     )
 
-    onFiltersChange(validFilters)
-  }, [conditions, onFiltersChange])
+    onFiltersChange({ filters: validFilters, logic: logicOperator })
+  }, [conditions, logicOperator, onFiltersChange])
 
   const fieldOptions = getFieldOptions()
   const activeCount = getActiveFilterCount()
@@ -187,7 +186,19 @@ export default function ProductFilters({ onFiltersChange, suppliers = [] }) {
               return (
                 <div key={condition.id} className="flex items-center gap-2">
                   {condIndex > 0 && (
-                    <span className="text-sm text-muted-foreground ml-2">and</span>
+                    <Select
+                      value={logicOperator}
+                      onValueChange={setLogicOperator}
+                      className="w-20"
+                    >
+                      <SelectTrigger className="h-8 w-20 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="and">AND</SelectItem>
+                        <SelectItem value="or">OR</SelectItem>
+                      </SelectContent>
+                    </Select>
                   )}
                   {condIndex === 0 && (
                     <span className="text-sm text-muted-foreground">Where</span>

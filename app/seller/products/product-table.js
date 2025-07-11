@@ -1201,14 +1201,18 @@ export function ProductTable() {
   }
 
   const applyFilters = () => {
-    if (!filters || filters.length === 0) {
+    if (!filters || (filters.filters && filters.filters.length === 0)) {
       setFilteredProducts(products)
       return
     }
 
+    // Handle both old format (array) and new format (object with filters and logic)
+    const filterConditions = Array.isArray(filters) ? filters : (filters.filters || [])
+    const logicOperator = filters.logic || 'and'
+
     const filtered = products.filter(product => {
-      // Check if product matches all conditions (AND logic)
-      return filters.every(condition => {
+      // Check if product matches conditions based on logic operator
+      const checkCondition = (condition) => {
         if (!condition.field || !condition.operator) return true
 
         const value = product[condition.field]
@@ -1294,7 +1298,14 @@ export function ProductTable() {
           default:
             return true
         }
-      })
+      }
+      
+      // Apply logic operator (AND or OR)
+      if (logicOperator === 'or') {
+        return filterConditions.some(checkCondition)
+      } else {
+        return filterConditions.every(checkCondition)
+      }
     })
 
     setFilteredProducts(filtered)
