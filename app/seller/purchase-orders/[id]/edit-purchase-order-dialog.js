@@ -90,6 +90,13 @@ export default function EditPurchaseOrderDialog({
     const newItems = [...formData.items]
     
     if (field === 'product_id') {
+      // Check if product is already in the order
+      const isDuplicate = formData.items.some((item, i) => i !== index && item.product_id === value)
+      if (isDuplicate) {
+        alert('This product is already in the order. Please update the existing item instead.')
+        return
+      }
+      
       const product = products.find(p => p.id === value)
       if (product) {
         const productSupplier = product.product_suppliers?.find(ps => ps.vendor_id === order.supplier_id)
@@ -271,10 +278,20 @@ export default function EditPurchaseOrderDialog({
                               const productSupplier = product.product_suppliers?.find(ps => ps.vendor_id === order.supplier_id)
                               if (!productSupplier) return null
                               
+                              // Check if product is already in the order (but not the current item)
+                              const isAlreadyInOrder = formData.items.some((orderItem, i) => 
+                                i !== index && orderItem.product_id === product.id
+                              )
+                              
                               return (
-                                <SelectItem key={product.id} value={product.id}>
+                                <SelectItem 
+                                  key={product.id} 
+                                  value={product.id}
+                                  disabled={isAlreadyInOrder}
+                                >
                                   {product.sku} - {product.product_name}
                                   {productSupplier.moq && ` (MOQ: ${productSupplier.moq})`}
+                                  {isAlreadyInOrder && ' (Already in order)'}
                                 </SelectItem>
                               )
                             })}
