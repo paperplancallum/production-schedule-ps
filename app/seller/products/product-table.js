@@ -88,6 +88,15 @@ function ProductSuppliers({ productId, productName }) {
       const { data: userData } = await supabase.auth.getUser()
       if (!userData.user) return
 
+      // First, let's see all vendors to debug
+      const { data: allVendors, error: allError } = await supabase
+        .from('vendors')
+        .select('id, vendor_name, vendor_type, status')
+        .eq('seller_id', userData.user.id)
+        .eq('status', 'accepted')
+
+      console.log('All accepted vendors:', allVendors)
+
       const { data, error } = await supabase
         .from('vendors')
         .select('id, vendor_name, vendor_type')
@@ -97,6 +106,7 @@ function ProductSuppliers({ productId, productName }) {
         .order('vendor_name')
 
       if (!error && data) {
+        console.log('Filtered suppliers:', data)
         setVendors(data)
       }
     } catch (error) {
