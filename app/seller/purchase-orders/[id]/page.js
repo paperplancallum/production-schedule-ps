@@ -5,51 +5,10 @@ import PurchaseOrderDetail from './purchase-order-detail'
 export default async function PurchaseOrderPage({ params }) {
   const supabase = await createClient()
   
-  // Get purchase order with all related data
+  // Get purchase order
   const { data: order, error } = await supabase
     .from('purchase_orders')
-    .select(`
-      *,
-      supplier:vendors!supplier_id(
-        id,
-        vendor_name,
-        vendor_type,
-        vendor_email,
-        vendor_phone
-      ),
-      items:purchase_order_items(
-        id,
-        quantity,
-        unit_price,
-        line_total,
-        notes,
-        product:products(
-          id,
-          product_name,
-          sku,
-          description,
-          unit_of_measure
-        ),
-        product_supplier:product_suppliers(
-          id,
-          lead_time_days,
-          moq
-        ),
-        price_tier:supplier_price_tiers(
-          id,
-          minimum_order_quantity,
-          unit_price
-        )
-      ),
-      status_history:purchase_order_status_history(
-        id,
-        from_status,
-        to_status,
-        notes,
-        created_at,
-        changed_by
-      )
-    `)
+    .select('*')
     .eq('id', params.id)
     .single()
 
@@ -57,5 +16,72 @@ export default async function PurchaseOrderPage({ params }) {
     notFound()
   }
 
-  return <PurchaseOrderDetail order={order} />
+  // Fetch supplier details separately
+  const { data: supplier } = await supabase
+    .from('vendors')
+    .select('id, vendor_name, vendor_type, vendor_email, vendor_phone')
+    .eq('id', order.supplier_id)
+    .single()
+
+  // Fetch order items with related data
+  const { data: items } = await supabase
+    .from('purchase_order_items')
+    .select(`
+      id,
+      quantity,
+      unit_price,
+      line_total,
+      notes,
+      product_id,
+      product_supplier_id,
+      price_tier_id
+    `)
+    .eq('purchase_order_id', order.id)
+
+  // Fetch product details for each item
+  const itemsWithDetails = await Promise.all(
+    (items || []).map(async (item) => {
+      const { data: product } = await supabase
+        .from('products')
+        .select('id, product_name, sku, description, unit_of_measure')
+        .eq('id', item.product_id)
+        .single()
+
+      const { data: productSupplier } = await supabase
+        .from('product_suppliers')
+        .select('id, lead_time_days, moq')
+        .eq('id', item.product_supplier_id)
+        .single()
+
+      const { data: priceTier } = item.price_tier_id ? await supabase
+        .from('supplier_price_tiers')
+        .select('id, minimum_order_quantity, unit_price')
+        .eq('id', item.price_tier_id)
+        .single() : { data: null }
+
+      return {
+        ...item,
+        product,
+        product_supplier: productSupplier,
+        price_tier: priceTier
+      }
+    })
+  )
+
+  // Fetch status history
+  const { data: statusHistory } = await supabase
+    .from('purchase_order_status_history')
+    .select('id, from_status, to_status, notes, created_at, changed_by')
+    .eq('purchase_order_id', order.id)
+    .order('created_at', { ascending: false })
+
+  // Combine all data
+  const orderWithDetails = {
+    ...order,
+    supplier,
+    items: itemsWithDetails,
+    status_history: statusHistory || []
+  }
+
+  return <PurchaseOrderDetail order={orderWithDetails} />
 }
