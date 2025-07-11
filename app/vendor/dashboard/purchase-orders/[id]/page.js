@@ -44,33 +44,32 @@ export default async function VendorPurchaseOrderPage({ params }) {
     .eq('id', order.seller_id)
     .single()
 
-  // Fetch order items with product details through relation
-  const { data: itemsWithProducts } = await supabase
+  // Fetch order items with product details through product_suppliers relationship
+  const { data: items } = await supabase
     .from('purchase_order_items')
     .select(`
-      id,
-      quantity,
-      unit_price,
-      line_total,
-      notes,
-      product_id,
-      product_supplier_id,
-      price_tier_id,
-      products!product_id (
+      *,
+      product_supplier:product_suppliers!product_supplier_id (
         id,
-        product_name,
-        sku,
-        description,
-        unit_of_measure
+        product:products (
+          id,
+          product_name,
+          sku,
+          description,
+          unit_of_measure
+        )
       )
     `)
     .eq('purchase_order_id', order.id)
   
-  // Map the data to match expected structure
-  const itemsWithDetails = (itemsWithProducts || []).map(item => ({
+  // Map the nested structure to match expected format
+  const itemsWithDetails = (items || []).map(item => ({
     ...item,
-    product: item.products || item.product || null,
-    products: undefined // Remove the nested products field
+    product: item.product_supplier?.product || null,
+    product_supplier: item.product_supplier ? {
+      ...item.product_supplier,
+      product: undefined
+    } : null
   }))
 
   // Fetch status history
