@@ -1144,11 +1144,12 @@ export function ProductTable() {
         throw error
       }
 
-      // Process data to include primary supplier name and MOQ
+      // Process data to include primary supplier name, ID, and MOQ
       const processedData = (data || []).map(product => {
         const primarySupplier = product.product_suppliers?.find(s => s.is_primary)
         return {
           ...product,
+          primary_supplier_id: primarySupplier?.vendor_id || null,
           primary_supplier_name: primarySupplier?.vendors?.vendor_name || null,
           // Get MOQ from primary supplier only
           supplier_moq: primarySupplier?.moq || null
@@ -1322,7 +1323,13 @@ export function ProductTable() {
     }
     
     // Get the unique supplier IDs
-    const supplierIds = [...new Set(selectedProducts.map(product => product.primary_supplier_id))]
+    const supplierIds = [...new Set(selectedProducts.map(product => product.primary_supplier_id).filter(Boolean))]
+    
+    // Check if we have a valid supplier ID
+    if (supplierIds.length === 0 || !supplierIds[0]) {
+      toast.error('No valid supplier found for the selected products')
+      return
+    }
     
     // Check if all products have the same primary supplier
     if (supplierIds.length > 1) {
@@ -1340,6 +1347,7 @@ export function ProductTable() {
     
     if (error || !supplierData) {
       toast.error('Error fetching supplier details')
+      console.error('Supplier fetch error:', error)
       return
     }
     
@@ -1434,7 +1442,9 @@ export function ProductTable() {
                   ? `Set Primary Supplier First (${selectedIds.length})`
                   : hasMultipleSuppliers 
                     ? `Multiple Suppliers (${selectedIds.length})`
-                    : `Create PO - ${suppliers[0]} (${selectedIds.length})`
+                    : suppliers[0] 
+                      ? `Create PO - ${suppliers[0]} (${selectedIds.length})`
+                      : `Create PO (${selectedIds.length})`
                 }
               </Button>
             )
