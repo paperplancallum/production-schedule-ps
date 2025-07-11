@@ -122,7 +122,7 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
   const getNextStatuses = () => {
     const transitions = {
       'draft': [], // Remove sent_to_supplier - will be set automatically when emailing
-      'sent_to_supplier': ['approved'],
+      'sent_to_supplier': [], // Only vendor can approve, seller must wait
       'approved': ['in_progress'],
       'in_progress': ['complete'],
       'complete': [],
@@ -563,6 +563,12 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
                 <div>
                   <p className="text-sm text-gray-500">Trade Terms</p>
                   <p className="font-medium">{order.trade_terms}</p>
+                </div>
+              )}
+              {order.goods_ready_date && (
+                <div>
+                  <p className="text-sm text-gray-500">Goods Ready Date</p>
+                  <p className="font-medium">{formatDate(order.goods_ready_date)}</p>
                 </div>
               )}
               {order.notes && (

@@ -66,6 +66,7 @@ export default async function VendorPurchaseOrderPage({ params }) {
         .from('product_suppliers')
         .select(`
           id,
+          lead_time_days,
           products (
             id,
             product_name,
@@ -84,7 +85,8 @@ export default async function VendorPurchaseOrderPage({ params }) {
         
         itemsWithDetails = items.map(item => ({
           ...item,
-          product: suppliersMap[item.product_supplier_id]?.products || null
+          product: suppliersMap[item.product_supplier_id]?.products || null,
+          lead_time_days: suppliersMap[item.product_supplier_id]?.lead_time_days || 0
         }))
       }
     }

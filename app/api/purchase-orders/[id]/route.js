@@ -133,7 +133,7 @@ export async function PATCH(request, { params }) {
       } else {
         const validTransitions = {
           'draft': ['sent_to_supplier', 'cancelled'],
-          'sent_to_supplier': ['approved', 'cancelled'],
+          'sent_to_supplier': isVendor ? ['approved', 'cancelled'] : ['cancelled'], // Only vendors can approve
           'approved': isVendor ? ['in_progress'] : ['in_progress', 'cancelled'],
           'in_progress': isVendor ? ['approved', 'complete'] : ['complete', 'cancelled'],
           'complete': [],

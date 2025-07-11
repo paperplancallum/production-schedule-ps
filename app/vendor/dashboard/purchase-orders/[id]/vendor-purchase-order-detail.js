@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -18,13 +18,15 @@ import {
   Hash,
   Mail,
   Phone,
-  MapPin
+  MapPin,
+  Info
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import { vendorStatusConfig, getVendorStatus, getSellerStatus, getVendorStatusTransitions } from '@/lib/vendor-status-mapping'
 import jsPDF from 'jspdf'
@@ -33,6 +35,27 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
   const router = useRouter()
   const [order, setOrder] = useState(initialOrder)
   const [loading, setLoading] = useState(false)
+  const [goodsReadyDate, setGoodsReadyDate] = useState('')
+  
+  // Calculate default goods ready date on component mount
+  useEffect(() => {
+    if (order.goods_ready_date) {
+      // If already set, use existing date
+      setGoodsReadyDate(order.goods_ready_date)
+    } else {
+      // Calculate based on order date + longest lead time
+      const orderDate = new Date(order.created_at)
+      const leadTimes = order.items?.map(item => item.lead_time_days || 0) || []
+      const maxLeadTime = Math.max(...leadTimes, 0)
+      
+      const calculatedDate = new Date(orderDate)
+      calculatedDate.setDate(calculatedDate.getDate() + maxLeadTime)
+      
+      // Format as YYYY-MM-DD for input
+      const formattedDate = calculatedDate.toISOString().split('T')[0]
+      setGoodsReadyDate(formattedDate)
+    }
+  }, [order])
 
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -80,6 +103,37 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
     } catch (error) {
       console.error('Error updating status:', error)
       alert('Failed to update status')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoodsReadyDateUpdate = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/purchase-orders/${order.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ goods_ready_date: goodsReadyDate })
+      })
+
+      if (response.ok) {
+        const updatedOrder = await response.json()
+        setOrder({
+          ...order,
+          goods_ready_date: updatedOrder.goods_ready_date,
+          updated_at: updatedOrder.updated_at
+        })
+        alert('Goods ready date updated successfully')
+      } else {
+        const error = await response.json()
+        alert(`Error updating goods ready date: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error updating goods ready date:', error)
+      alert('Failed to update goods ready date')
     } finally {
       setLoading(false)
     }
@@ -415,14 +469,69 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
               )}
               
               {vendorStatus === 'to_approve' && (
-                <div className="text-sm text-gray-600">
-                  Review the order details and approve to begin production.
-                </div>
+                <>
+                  <div className="space-y-3 border rounded-lg p-4 bg-blue-50">
+                    <div className="flex items-start gap-2">
+                      <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+                      <div className="flex-1">
+                        <Label className="text-sm font-semibold text-blue-900">Goods Ready Date</Label>
+                        <p className="text-xs text-blue-700 mt-1">
+                          This date is calculated based on the order date plus the longest lead time 
+                          ({Math.max(...(order.items?.map(item => item.lead_time_days || 0) || [0]))} days) 
+                          for the items in this order. You can adjust it if needed.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="date"
+                        value={goodsReadyDate}
+                        onChange={(e) => setGoodsReadyDate(e.target.value)}
+                        className="flex-1"
+                        min={new Date().toISOString().split('T')[0]}
+                      />
+                      <Button 
+                        onClick={handleGoodsReadyDateUpdate}
+                        disabled={loading || goodsReadyDate === order.goods_ready_date}
+                        size="sm"
+                      >
+                        Update
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Review the order details and approve to begin production.
+                  </div>
+                </>
               )}
               
-              {vendorStatus === 'in_production' && (
-                <div className="text-sm text-gray-600">
-                  Update status when production is finished.
+              {(vendorStatus === 'approved' || vendorStatus === 'in_production') && (
+                <div className="space-y-3">
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <Label className="text-sm font-medium text-gray-700">Goods Ready Date</Label>
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        type="date"
+                        value={goodsReadyDate}
+                        onChange={(e) => setGoodsReadyDate(e.target.value)}
+                        className="flex-1"
+                        min={new Date().toISOString().split('T')[0]}
+                      />
+                      <Button 
+                        onClick={handleGoodsReadyDateUpdate}
+                        disabled={loading || goodsReadyDate === order.goods_ready_date}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Update
+                      </Button>
+                    </div>
+                  </div>
+                  {vendorStatus === 'in_production' && (
+                    <div className="text-sm text-gray-600">
+                      Update status when production is finished.
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -486,6 +595,12 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
                 <div>
                   <p className="text-sm text-gray-500">Requested Delivery</p>
                   <p className="font-medium">{formatDate(order.requested_delivery_date)}</p>
+                </div>
+              )}
+              {(order.goods_ready_date || goodsReadyDate) && (
+                <div>
+                  <p className="text-sm text-gray-500">Goods Ready Date</p>
+                  <p className="font-medium">{formatDate(order.goods_ready_date || goodsReadyDate)}</p>
                 </div>
               )}
               {order.trade_terms && (
