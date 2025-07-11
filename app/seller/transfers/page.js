@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, Search, Package, Truck, CheckCircle, XCircle, Clock, ArrowRight, Building, Warehouse } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import {
@@ -31,6 +31,12 @@ const statusConfig = {
   cancelled: { label: 'Cancelled', color: 'destructive', icon: XCircle }
 }
 
+const transferTypes = [
+  { value: 'in', label: 'In', description: 'Receiving from Purchase Order', color: 'green' },
+  { value: 'transfer', label: 'Transfer', description: 'Moving between locations', color: 'blue' },
+  { value: 'out', label: 'Out', description: 'Shipping to customer/FBA', color: 'orange' }
+]
+
 const locationTypes = [
   { value: 'production', label: 'Production', icon: Building },
   { value: 'supplier_warehouse', label: 'Supplier Warehouse', icon: Warehouse },
@@ -41,6 +47,7 @@ const locationTypes = [
 
 export default function TransfersPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [transfers, setTransfers] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -55,6 +62,8 @@ export default function TransfersPage() {
   })
   const [formData, setFormData] = useState({
     transfer_number: '',
+    transfer_type: 'transfer',
+    purchase_order_id: '',
     from_location: '',
     from_location_type: '',
     to_location: '',
@@ -71,6 +80,40 @@ export default function TransfersPage() {
     loadTransfers()
   }, [statusFilter])
 
+  useEffect(() => {
+    // Check for transfer creation from PO
+    const createTransfer = searchParams.get('create')
+    const transferType = searchParams.get('type')
+    const poNumbers = searchParams.get('po')
+
+    if (createTransfer === 'true' && transferType && poNumbers) {
+      // Set transfer type
+      setFormData(prev => ({
+        ...prev,
+        transfer_type: transferType,
+        purchase_order_id: poNumbers,
+        from_location: 'Supplier Warehouse',
+        from_location_type: 'supplier_warehouse',
+        to_location: '',
+        to_location_type: '3pl_warehouse',
+        notes: `Receiving inventory from Purchase Orders: ${poNumbers}`
+      }))
+      
+      // Open dialog
+      setCreateDialogOpen(true)
+      
+      // Load PO data to get items
+      loadPurchaseOrderData(poNumbers)
+      
+      // Clear URL parameters
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('create')
+      newUrl.searchParams.delete('type')
+      newUrl.searchParams.delete('po')
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [searchParams])
+
   const loadTransfers = async () => {
     setLoading(true)
     try {
@@ -86,6 +129,8 @@ export default function TransfersPage() {
         {
           id: '1',
           transfer_number: 'TRF-2025-0001',
+          transfer_type: 'in',
+          purchase_order_number: 'PO-2025-0123',
           from_location: 'Guangzhou Factory',
           from_location_type: 'production',
           to_location: 'Shenzhen Warehouse',
@@ -103,6 +148,7 @@ export default function TransfersPage() {
         {
           id: '2',
           transfer_number: 'TRF-2025-0002',
+          transfer_type: 'transfer',
           from_location: 'Shenzhen Warehouse',
           from_location_type: 'supplier_warehouse',
           to_location: 'LA 3PL Warehouse',
@@ -115,6 +161,24 @@ export default function TransfersPage() {
           carrier: 'DHL',
           items: [
             { sku: 'PROD-003', product_name: 'Gadget X', quantity: 1000 }
+          ]
+        },
+        {
+          id: '3',
+          transfer_number: 'TRF-2025-0003',
+          transfer_type: 'out',
+          from_location: 'LA 3PL Warehouse',
+          from_location_type: '3pl_warehouse',
+          to_location: 'Amazon FBA LAX9',
+          to_location_type: 'amazon_fba',
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          estimated_arrival: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          tracking_number: '',
+          carrier: 'Amazon Partner Carrier',
+          items: [
+            { sku: 'PROD-001', product_name: 'Widget A', quantity: 200 },
+            { sku: 'PROD-003', product_name: 'Gadget X', quantity: 500 }
           ]
         }
       ]
@@ -141,6 +205,60 @@ export default function TransfersPage() {
       arrived: transferData.filter(t => t.status === 'arrived').length
     }
     setStats(stats)
+  }
+
+  const loadPurchaseOrderData = async (poNumbers) => {
+    try {
+      const poNumberArray = poNumbers.split(',')
+      
+      // Fetch PO data
+      const response = await fetch('/api/purchase-orders')
+      const allOrders = await response.json()
+      
+      if (response.ok) {
+        // Filter for the specific POs
+        const selectedOrders = allOrders.filter(order => 
+          poNumberArray.includes(order.po_number)
+        )
+        
+        // Aggregate items from all selected POs
+        const aggregatedItems = []
+        
+        selectedOrders.forEach(order => {
+          if (order.items && order.items.length > 0) {
+            order.items.forEach(item => {
+              const existingItem = aggregatedItems.find(i => 
+                i.sku === item.product?.sku
+              )
+              
+              if (existingItem) {
+                existingItem.quantity += item.quantity
+              } else {
+                aggregatedItems.push({
+                  sku: item.product?.sku || 'Unknown',
+                  product_name: item.product?.product_name || 'Unknown Product',
+                  quantity: item.quantity,
+                  unit: item.product?.unit_of_measure || 'units'
+                })
+              }
+            })
+          }
+        })
+        
+        // Update form with items and supplier info
+        const firstOrder = selectedOrders[0]
+        if (firstOrder) {
+          setFormData(prev => ({
+            ...prev,
+            from_location: firstOrder.supplier?.vendor_name || 'Supplier Warehouse',
+            items: aggregatedItems
+          }))
+        }
+      }
+    } catch (error) {
+      console.error('Error loading PO data:', error)
+      toast.error('Failed to load purchase order data')
+    }
   }
 
   const filteredTransfers = transfers.filter(transfer => {
@@ -184,8 +302,32 @@ export default function TransfersPage() {
       // Generate transfer number
       const transferNumber = `TRF-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
       
-      // In a real implementation, this would save to the database
-      toast.success(`Transfer ${transferNumber} created successfully`)
+      // In a real implementation, this would save to the database with formData
+      // For now, show success with details
+      const itemCount = formData.items?.length || 0
+      const totalQuantity = formData.items?.reduce((sum, item) => sum + item.quantity, 0) || 0
+      
+      toast.success(
+        `Transfer ${transferNumber} created successfully${
+          itemCount > 0 ? ` with ${itemCount} items (${totalQuantity} units)` : ''
+        }`
+      )
+      
+      // Reset form and close dialog
+      setFormData({
+        transfer_number: '',
+        transfer_type: 'transfer',
+        purchase_order_id: '',
+        from_location: '',
+        from_location_type: '',
+        to_location: '',
+        to_location_type: '',
+        estimated_arrival: '',
+        tracking_number: '',
+        carrier: '',
+        notes: '',
+        items: []
+      })
       setCreateDialogOpen(false)
       loadTransfers()
     } catch (error) {
@@ -285,6 +427,7 @@ export default function TransfersPage() {
                 />
               </TableHead>
               <TableHead>Transfer Number</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>From</TableHead>
               <TableHead>To</TableHead>
               <TableHead>Items</TableHead>
@@ -296,13 +439,13 @@ export default function TransfersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   Loading transfers...
                 </TableCell>
               </TableRow>
             ) : filteredTransfers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   <div className="flex flex-col items-center">
                     <Package className="h-12 w-12 text-gray-400 mb-2" />
                     <p className="text-gray-500">No transfers found</p>
@@ -341,6 +484,22 @@ export default function TransfersPage() {
                       onClick={() => handleRowClick(transfer.id)}
                     >
                       {transfer.transfer_number}
+                    </TableCell>
+                    <TableCell onClick={() => handleRowClick(transfer.id)}>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={
+                          transfer.transfer_type === 'in' ? 'green' :
+                          transfer.transfer_type === 'out' ? 'orange' :
+                          'blue'
+                        } className="text-xs">
+                          {transferTypes.find(t => t.value === transfer.transfer_type)?.label || transfer.transfer_type}
+                        </Badge>
+                        {transfer.transfer_type === 'in' && transfer.purchase_order_number && (
+                          <span className="text-xs text-slate-500">
+                            {transfer.purchase_order_number}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell onClick={() => handleRowClick(transfer.id)}>
                       <div className="flex items-center gap-2">
@@ -410,6 +569,43 @@ export default function TransfersPage() {
           </DialogHeader>
           <form onSubmit={handleCreateTransfer}>
             <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="col-span-2 space-y-2">
+                <Label>Transfer Type *</Label>
+                <Select
+                  value={formData.transfer_type}
+                  onValueChange={(value) => setFormData({ ...formData, transfer_type: value })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select transfer type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {transferTypes.map(type => (
+                      <SelectItem key={type.value} value={type.value}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{type.label}</span>
+                          <span className="text-xs text-muted-foreground">- {type.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {formData.transfer_type === 'in' && (
+                <div className="col-span-2 space-y-2">
+                  <Label>Purchase Order Reference</Label>
+                  <Input
+                    value={formData.purchase_order_id}
+                    onChange={(e) => setFormData({ ...formData, purchase_order_id: e.target.value })}
+                    placeholder="Enter PO number (optional)"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Link this transfer to a Purchase Order for tracking
+                  </p>
+                </div>
+              )}
+              
               <div className="space-y-2">
                 <Label>From Location *</Label>
                 <Input
@@ -499,9 +695,53 @@ export default function TransfersPage() {
                   rows={3}
                 />
               </div>
+              
+              {/* Show items if creating from PO */}
+              {formData.items && formData.items.length > 0 && (
+                <div className="col-span-2 space-y-2">
+                  <Label>Items to Transfer</Label>
+                  <div className="border rounded-md p-4 space-y-2 max-h-48 overflow-y-auto">
+                    {formData.items.map((item, index) => (
+                      <div key={index} className="flex justify-between items-center text-sm">
+                        <div>
+                          <span className="font-medium">{item.sku}</span>
+                          <span className="text-muted-foreground ml-2">- {item.product_name}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-medium">{item.quantity}</span>
+                          <span className="text-muted-foreground ml-1">{item.unit}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="border-t pt-2 mt-2">
+                      <div className="flex justify-between items-center font-medium">
+                        <span>Total Items:</span>
+                        <span>{formData.items.reduce((sum, item) => sum + item.quantity, 0)} units</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => {
+                setCreateDialogOpen(false)
+                // Reset form to defaults
+                setFormData({
+                  transfer_number: '',
+                  transfer_type: 'transfer',
+                  purchase_order_id: '',
+                  from_location: '',
+                  from_location_type: '',
+                  to_location: '',
+                  to_location_type: '',
+                  estimated_arrival: '',
+                  tracking_number: '',
+                  carrier: '',
+                  notes: '',
+                  items: []
+                })
+              }}>
                 Cancel
               </Button>
               <Button type="submit">

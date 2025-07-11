@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, Search, FileText, Package, Truck, CheckCircle, XCircle, Clock, ClipboardCheck, Eye } from 'lucide-react'
+import { Plus, Search, FileText, Package, Truck, CheckCircle, XCircle, Clock, ClipboardCheck, Eye, ArrowDownToLine } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import CreatePurchaseOrderDialog from './create-purchase-order-dialog'
 import ScheduleInspectionDialog from './schedule-inspection-dialog'
@@ -37,6 +37,7 @@ export default function PurchaseOrdersPage() {
   const [inspectionData, setInspectionData] = useState(null)
   const [inspections, setInspections] = useState([])
   const [inspectionMode, setInspectionMode] = useState(false)
+  const [transferMode, setTransferMode] = useState(false)
   const [stats, setStats] = useState({
     total: 0,
     draft: 0,
@@ -170,26 +171,39 @@ export default function PurchaseOrdersPage() {
           setSelectedOrders([orderId])
         } else {
           // Check if all currently selected orders have the same supplier as this one
-        const selectedOrdersData = orders.filter(o => selectedOrders.includes(o.id))
-        const currentSupplierId = selectedOrdersData[0]?.supplier_id
-        
-        if (order.supplier_id === currentSupplierId) {
-          setSelectedOrders([...selectedOrders, orderId])
-        } else {
-          toast.error('You can only select orders from the same supplier for inspection')
+          const selectedOrdersData = orders.filter(o => selectedOrders.includes(o.id))
+          const currentSupplierId = selectedOrdersData[0]?.supplier_id
+          
+          if (order.supplier_id === currentSupplierId) {
+            setSelectedOrders([...selectedOrders, orderId])
+          } else {
+            toast.error('You can only select orders from the same supplier for inspection')
+          }
         }
+      } else {
+        setSelectedOrders(selectedOrders.filter(id => id !== orderId))
+      }
+    } else if (transferMode) {
+      // In transfer mode, apply transfer-specific validation
+      if (checked) {
+        // Check if order status allows transfer
+        if (order.status !== 'complete' && order.status !== 'approved' && order.status !== 'in_progress') {
+          toast.error('Only approved, in progress, or completed orders can be transferred')
+          return
+        }
+        
+        setSelectedOrders([...selectedOrders, orderId])
+      } else {
+        setSelectedOrders(selectedOrders.filter(id => id !== orderId))
       }
     } else {
-      setSelectedOrders(selectedOrders.filter(id => id !== orderId))
+      // Normal mode - just toggle selection without restrictions
+      if (checked) {
+        setSelectedOrders([...selectedOrders, orderId])
+      } else {
+        setSelectedOrders(selectedOrders.filter(id => id !== orderId))
+      }
     }
-  } else {
-    // Normal mode - just toggle selection without restrictions
-    if (checked) {
-      setSelectedOrders([...selectedOrders, orderId])
-    } else {
-      setSelectedOrders(selectedOrders.filter(id => id !== orderId))
-    }
-  }
 }
 
   const handleSelectAll = (checked) => {
@@ -217,6 +231,29 @@ export default function PurchaseOrdersPage() {
     } else {
       setSelectedOrders([])
     }
+  }
+
+  const handleCreateTransfer = () => {
+    if (selectedOrders.length === 0) {
+      toast.error('Please select at least one purchase order')
+      return
+    }
+    
+    const selectedOrderData = orders.filter(order => selectedOrders.includes(order.id))
+    
+    // Check if all selected orders are complete or approved
+    const invalidOrders = selectedOrderData.filter(order => 
+      order.status !== 'complete' && order.status !== 'approved' && order.status !== 'in_progress'
+    )
+    
+    if (invalidOrders.length > 0) {
+      toast.error('Only approved, in progress, or completed orders can be transferred')
+      return
+    }
+    
+    // Navigate to transfers page with PO data
+    const poNumbers = selectedOrderData.map(o => o.po_number).join(',')
+    router.push(`/seller/transfers?create=true&type=in&po=${encodeURIComponent(poNumbers)}`)
   }
 
   const prepareInspectionData = () => {
@@ -308,8 +345,39 @@ export default function PurchaseOrdersPage() {
                   Schedule Inspection {selectedOrders.length > 0 && `(${selectedOrders.length})`}
                 </Button>
               </>
+            ) : transferMode ? (
+              <>
+                <Button
+                  onClick={() => {
+                    setTransferMode(false)
+                    setSelectedOrders([])
+                  }}
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateTransfer}
+                  variant="default"
+                  className="bg-green-600 hover:bg-green-700"
+                  disabled={selectedOrders.length === 0}
+                >
+                  <ArrowDownToLine className="h-4 w-4 mr-2" />
+                  Create Transfer {selectedOrders.length > 0 && `(${selectedOrders.length})`}
+                </Button>
+              </>
             ) : (
               <>
+                <Button
+                  onClick={() => {
+                    setTransferMode(true)
+                    setSelectedOrders([])
+                  }}
+                  variant="outline"
+                >
+                  <ArrowDownToLine className="h-4 w-4 mr-2" />
+                  Receive Inventory
+                </Button>
                 <Button
                   onClick={() => {
                     setInspectionMode(true)
@@ -318,7 +386,7 @@ export default function PurchaseOrdersPage() {
                   variant="outline"
                 >
                   <ClipboardCheck className="h-4 w-4 mr-2" />
-                  Create New Inspection
+                  Create Inspection
                 </Button>
                 <Button onClick={() => setCreateDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -337,6 +405,17 @@ export default function PurchaseOrdersPage() {
           <AlertDescription className="text-blue-900 dark:text-blue-100">
             <strong>Inspection Mode:</strong> Select orders from the same supplier to create an inspection. 
             Orders with existing inspections cannot be selected.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {/* Transfer Mode Banner */}
+      {transferMode && (
+        <Alert className="mb-6 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+          <ArrowDownToLine className="h-4 w-4 text-green-600 dark:text-green-400" />
+          <AlertDescription className="text-green-900 dark:text-green-100">
+            <strong>Receive Inventory Mode:</strong> Select approved or completed orders to create incoming transfers. 
+            This will record inventory receipt from your suppliers.
           </AlertDescription>
         </Alert>
       )}
@@ -470,6 +549,12 @@ export default function PurchaseOrdersPage() {
                       disabledReason = 'Different supplier'
                     }
                   }
+                } else if (transferMode) {
+                  // In transfer mode, apply restrictions
+                  if (order.status !== 'complete' && order.status !== 'approved' && order.status !== 'in_progress') {
+                    canSelect = false
+                    disabledReason = 'Only approved, in progress, or completed orders can be transferred'
+                  }
                 }
                 // In normal mode, all checkboxes are enabled
                 
@@ -477,7 +562,7 @@ export default function PurchaseOrdersPage() {
                   <TableRow
                     key={order.id}
                     className={`hover:bg-gray-50 dark:hover:bg-slate-800 ${
-                      inspectionMode && !canSelect && !isSelected ? 'opacity-50' : ''
+                      (inspectionMode || transferMode) && !canSelect && !isSelected ? 'opacity-50' : ''
                     }`}
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
