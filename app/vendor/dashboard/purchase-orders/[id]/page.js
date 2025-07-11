@@ -44,33 +44,74 @@ export default async function VendorPurchaseOrderPage({ params }) {
     .eq('id', order.seller_id)
     .single()
 
-  // Fetch order items with product details through product_suppliers relationship
+  // First, fetch order items
   const { data: items } = await supabase
     .from('purchase_order_items')
-    .select(`
-      *,
-      product_supplier:product_suppliers!product_supplier_id (
-        id,
-        product:products (
-          id,
-          product_name,
-          sku,
-          description,
-          unit_of_measure
-        )
-      )
-    `)
+    .select('*')
     .eq('purchase_order_id', order.id)
+
+  // For existing purchase orders, we need to get product details
+  // Even if products aren't assigned to the vendor, they should see products in their POs
+  let itemsWithDetails = items || []
   
-  // Map the nested structure to match expected format
-  const itemsWithDetails = (items || []).map(item => ({
-    ...item,
-    product: item.product_supplier?.product || null,
-    product_supplier: item.product_supplier ? {
-      ...item.product_supplier,
-      product: undefined
-    } : null
-  }))
+  if (items && items.length > 0) {
+    // Get all product supplier IDs
+    const productSupplierIds = items
+      .map(item => item.product_supplier_id)
+      .filter(Boolean)
+    
+    if (productSupplierIds.length > 0) {
+      // Fetch product suppliers with products
+      const { data: productSuppliers } = await supabase
+        .from('product_suppliers')
+        .select(`
+          id,
+          products (
+            id,
+            product_name,
+            sku,
+            description,
+            unit_of_measure
+          )
+        `)
+        .in('id', productSupplierIds)
+      
+      if (productSuppliers) {
+        const suppliersMap = productSuppliers.reduce((acc, ps) => {
+          acc[ps.id] = ps
+          return acc
+        }, {})
+        
+        itemsWithDetails = items.map(item => ({
+          ...item,
+          product: suppliersMap[item.product_supplier_id]?.products || null
+        }))
+      }
+    }
+    
+    // If we still don't have products, try direct product fetch as last resort
+    const itemsWithoutProducts = itemsWithDetails.filter(item => !item.product && item.product_id)
+    if (itemsWithoutProducts.length > 0) {
+      const productIds = [...new Set(itemsWithoutProducts.map(item => item.product_id))]
+      
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, product_name, sku, description, unit_of_measure')
+        .in('id', productIds)
+      
+      if (products) {
+        const productsMap = products.reduce((acc, product) => {
+          acc[product.id] = product
+          return acc
+        }, {})
+        
+        itemsWithDetails = itemsWithDetails.map(item => ({
+          ...item,
+          product: item.product || productsMap[item.product_id] || null
+        }))
+      }
+    }
+  }
 
   // Fetch status history
   const { data: statusHistory } = await supabase
