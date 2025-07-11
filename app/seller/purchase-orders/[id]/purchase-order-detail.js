@@ -221,7 +221,7 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
       pdf.text(supplier.vendor_name || supplier.name || 'Supplier Name', 110, yPos)
       yPos += 6
       
-      // Vendor Address
+      // Vendor Address - check both structured fields and legacy address field
       if (supplier.address_line1) {
         pdf.text(supplier.address_line1, 110, yPos)
         yPos += 6
@@ -238,19 +238,27 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
           pdf.text(supplier.country, 110, yPos)
           yPos += 6
         }
+      } else if (supplier.address) {
+        // Fall back to legacy address field if structured fields are empty
+        pdf.text(supplier.address, 110, yPos)
+        yPos += 6
+        if (supplier.country) {
+          pdf.text(supplier.country, 110, yPos)
+          yPos += 6
+        }
       }
       
       // Vendor Contact info
-      if (supplier.vendor_email) {
-        pdf.text(`Email: ${supplier.vendor_email}`, 110, yPos)
+      if (supplier.vendor_email || supplier.email) {
+        pdf.text(`Email: ${supplier.vendor_email || supplier.email}`, 110, yPos)
         yPos += 6
       }
       if (supplier.vendor_phone) {
         pdf.text(`Phone: ${supplier.vendor_phone}`, 110, yPos)
         yPos += 6
       }
-      if (supplier.contact_person) {
-        pdf.text(`Contact: ${supplier.contact_person}`, 110, yPos)
+      if (supplier.contact_person || supplier.contact_name) {
+        pdf.text(`Contact: ${supplier.contact_person || supplier.contact_name}`, 110, yPos)
         yPos += 6
       }
       if (supplier.tax_id) {
