@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import CreatePurchaseOrderDialog from '@/app/seller/purchase-orders/create-purchase-order-dialog'
+import ProductFilters from './product-filters'
 
 // Component for the expanded row content
 function ProductSuppliers({ productId, productName, onPriceUpdate }) {
@@ -1076,6 +1077,7 @@ const columns = [
 
 export function ProductTable() {
   const [products, setProducts] = useState([])
+  const [filteredProducts, setFilteredProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [isAddingProduct, setIsAddingProduct] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
@@ -1084,6 +1086,8 @@ export function ProductTable() {
   const [selectedSupplierForPO, setSelectedSupplierForPO] = useState(null)
   const [selectedProductsForPO, setSelectedProductsForPO] = useState([])
   const [firstSelectedSupplierId, setFirstSelectedSupplierId] = useState(null)
+  const [suppliers, setSuppliers] = useState([])
+  const [filters, setFilters] = useState([])
   const [formData, setFormData] = useState({
     product_name: '',
     sku: '',
@@ -1096,7 +1100,12 @@ export function ProductTable() {
 
   useEffect(() => {
     fetchProducts()
+    fetchSuppliers()
   }, [])
+
+  useEffect(() => {
+    applyFilters()
+  }, [products, filters])
 
   const fetchProducts = async () => {
     try {
@@ -1159,6 +1168,7 @@ export function ProductTable() {
       })
 
       setProducts(processedData)
+      setFilteredProducts(processedData)
     } catch (error) {
       console.error('Error fetching products:', error)
       // Don't show error toast for missing table
@@ -1170,6 +1180,86 @@ export function ProductTable() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchSuppliers = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData.user) return
+
+      const { data } = await supabase
+        .from('vendors')
+        .select('id, vendor_name')
+        .eq('seller_id', userData.user.id)
+        .eq('vendor_type', 'supplier')
+        .order('vendor_name')
+
+      setSuppliers(data || [])
+    } catch (error) {
+      console.error('Error fetching suppliers:', error)
+    }
+  }
+
+  const applyFilters = () => {
+    if (!filters || filters.length === 0) {
+      setFilteredProducts(products)
+      return
+    }
+
+    const filtered = products.filter(product => {
+      // Check if product matches all conditions (AND logic)
+      return filters.every(condition => {
+        if (!condition.field || !condition.operator) return true
+
+        const value = product[condition.field]
+        const filterValue = condition.value
+
+        switch (condition.operator) {
+          case 'contains':
+            return value && value.toString().toLowerCase().includes(filterValue.toLowerCase())
+          case 'not_contains':
+            return !value || !value.toString().toLowerCase().includes(filterValue.toLowerCase())
+          case 'equals':
+            return value === filterValue || (condition.field === 'price' && parseFloat(value) === parseFloat(filterValue))
+          case 'not_equals':
+            return value !== filterValue
+          case 'starts_with':
+            return value && value.toString().toLowerCase().startsWith(filterValue.toLowerCase())
+          case 'ends_with':
+            return value && value.toString().toLowerCase().endsWith(filterValue.toLowerCase())
+          case 'is_empty':
+            return !value || value === ''
+          case 'is_not_empty':
+            return value && value !== ''
+          case 'greater_than':
+            return parseFloat(value) > parseFloat(filterValue)
+          case 'less_than':
+            return parseFloat(value) < parseFloat(filterValue)
+          case 'greater_or_equal':
+            return parseFloat(value) >= parseFloat(filterValue)
+          case 'less_or_equal':
+            return parseFloat(value) <= parseFloat(filterValue)
+          case 'is_any_of':
+            if (Array.isArray(filterValue)) {
+              return filterValue.some(v => 
+                value && value.toString().toLowerCase() === v.toLowerCase()
+              )
+            }
+            return false
+          case 'is_none_of':
+            if (Array.isArray(filterValue)) {
+              return !filterValue.some(v => 
+                value && value.toString().toLowerCase() === v.toLowerCase()
+              )
+            }
+            return true
+          default:
+            return true
+        }
+      })
+    })
+
+    setFilteredProducts(filtered)
   }
 
   const handleAddProduct = async (e) => {
@@ -1430,7 +1520,7 @@ export function ProductTable() {
           {Object.keys(selectedRows).length > 0 && (() => {
             const selectedRowIds = Object.keys(selectedRows).filter(id => selectedRows[id])
             // Get products from row indices
-            const selectedProducts = selectedRowIds.map(rowId => products[parseInt(rowId)]).filter(Boolean)
+            const selectedProducts = selectedRowIds.map(rowId => filteredProducts[parseInt(rowId)]).filter(Boolean)
             const suppliers = [...new Set(selectedProducts.map(product => product.primary_supplier_name).filter(Boolean))]
             const hasMultipleSuppliers = suppliers.length > 1
             const hasNoSupplier = selectedProducts.some(product => !product.primary_supplier_name)
@@ -1455,6 +1545,11 @@ export function ProductTable() {
           })()}
         </div>
       </div>
+
+      <ProductFilters 
+        onFiltersChange={setFilters}
+        suppliers={suppliers}
+      />
 
       <Sheet open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
         <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
@@ -1507,23 +1602,37 @@ export function ProductTable() {
         <div className="flex items-center justify-center p-8">
           <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
         </div>
-      ) : products.length === 0 ? (
+      ) : filteredProducts.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-12 text-center">
-          <div className="rounded-full bg-slate-100 p-4 mb-4">
-            <Plus className="h-8 w-8 text-slate-400" />
-          </div>
-          <h3 className="text-lg font-medium text-slate-900 mb-2">No products yet</h3>
-          <p className="text-slate-600 mb-4">Get started by adding your first product</p>
-          <Button onClick={() => setIsAddingProduct(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Your First Product
-          </Button>
+          {products.length === 0 ? (
+            <>
+              <div className="rounded-full bg-slate-100 p-4 mb-4">
+                <Plus className="h-8 w-8 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-medium text-slate-900 mb-2">No products yet</h3>
+              <p className="text-slate-600 mb-4">Get started by adding your first product</p>
+              <Button onClick={() => setIsAddingProduct(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Your First Product
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="rounded-full bg-slate-100 p-4 mb-4">
+                <Filter className="h-8 w-8 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-medium text-slate-900 mb-2">No products match your filters</h3>
+              <p className="text-slate-600 mb-4">Try adjusting your filters to see more results</p>
+              <Button onClick={() => setFilters([])} variant="outline">
+                Clear Filters
+              </Button>
+            </>
+          )}
         </div>
       ) : (
         <DataTable
           columns={columns}
-          data={products}
-          searchKey="product_name"
+          data={filteredProducts}
           renderSubComponent={({ row }) => (
             <ProductSuppliers
               productId={row.original.id}
