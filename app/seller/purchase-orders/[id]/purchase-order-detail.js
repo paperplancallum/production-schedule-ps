@@ -78,22 +78,9 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
 
       if (response.ok) {
         const updatedOrder = await response.json()
-        
-        // Fetch updated order with status history
-        const historyResponse = await fetch(`/api/purchase-orders/${order.id}`)
-        if (historyResponse.ok) {
-          const fullOrder = await historyResponse.json()
-          setOrder(fullOrder)
-          toast.success('Status updated successfully')
-        } else {
-          // Still update with what we have
-          setOrder({
-            ...order,
-            status: updatedOrder.status,
-            updated_at: updatedOrder.updated_at
-          })
-          toast.success('Status updated')
-        }
+        // The PATCH endpoint now returns the complete order with status history
+        setOrder(updatedOrder)
+        toast.success('Status updated successfully')
       } else {
         const error = await response.json()
         toast.error(`Error updating status: ${error.error}`)
@@ -229,7 +216,7 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
       yPos += 8
       
       const supplier = order.supplier || {}
-      pdf.text(supplier.vendor_name || 'Supplier Name', 110, yPos)
+      pdf.text(supplier.vendor_name || supplier.name || 'Supplier Name', 110, yPos)
       yPos += 6
       
       // Vendor Address

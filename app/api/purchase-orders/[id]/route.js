@@ -17,13 +17,40 @@ export async function GET(request, { params }) {
       .from('purchase_orders')
       .select(`
         *,
+        seller:sellers!seller_id(
+          id,
+          full_name,
+          company_name,
+          address_line1,
+          address_line2,
+          city,
+          state,
+          zip_code,
+          country,
+          business_email,
+          business_phone,
+          tax_id,
+          website,
+          email,
+          phone_number
+        ),
         supplier:vendors!supplier_id(
           id,
           vendor_code,
           vendor_name,
+          vendor_email,
+          vendor_phone,
           email,
           address,
-          contact_name
+          contact_name,
+          contact_person,
+          address_line1,
+          address_line2,
+          city,
+          state,
+          zip_code,
+          country,
+          tax_id
         ),
         items:purchase_order_items(
           id,
@@ -249,7 +276,124 @@ export async function PATCH(request, { params }) {
       }
     }
 
-    return NextResponse.json(data)
+    // Fetch the complete order with status history after updates
+    const { data: completeOrder, error: fetchError } = await supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        seller:sellers!seller_id(
+          id,
+          full_name,
+          company_name,
+          address_line1,
+          address_line2,
+          city,
+          state,
+          zip_code,
+          country,
+          business_email,
+          business_phone,
+          tax_id,
+          website,
+          email,
+          phone_number
+        ),
+        supplier:vendors!supplier_id(
+          id,
+          vendor_code,
+          vendor_name,
+          vendor_email,
+          vendor_phone,
+          email,
+          address,
+          contact_name,
+          contact_person,
+          address_line1,
+          address_line2,
+          city,
+          state,
+          zip_code,
+          country,
+          tax_id
+        ),
+        items:purchase_order_items(
+          id,
+          quantity,
+          unit_price,
+          line_total,
+          notes,
+          product:products(
+            id,
+            product_name,
+            sku,
+            description,
+            unit_of_measure
+          ),
+          product_supplier:product_suppliers(
+            id,
+            lead_time_days,
+            moq
+          ),
+          price_tier:supplier_price_tiers(
+            id,
+            minimum_order_quantity,
+            unit_price
+          )
+        ),
+        status_history:purchase_order_status_history(
+          id,
+          from_status,
+          to_status,
+          notes,
+          created_at,
+          changed_by
+        )
+      `)
+      .eq('id', id)
+      .single()
+
+    if (fetchError) {
+      console.error('Error fetching complete order:', fetchError)
+      // Return the basic update data if we can't fetch the complete order
+      return NextResponse.json(data)
+    }
+
+    // Fetch user details for status history
+    if (completeOrder.status_history && completeOrder.status_history.length > 0) {
+      const statusHistoryWithUsers = await Promise.all(
+        completeOrder.status_history.map(async (history) => {
+          if (!history.changed_by) return history
+          
+          // Try to find if it's a seller
+          const { data: seller } = await supabase
+            .from('sellers')
+            .select('id, company_name, full_name')
+            .eq('id', history.changed_by)
+            .single()
+          
+          if (seller) {
+            return { ...history, changed_by_user: { type: 'seller', name: seller.company_name || seller.full_name || 'Seller' } }
+          }
+          
+          // Try to find if it's a vendor
+          const { data: vendor } = await supabase
+            .from('vendors')
+            .select('id, vendor_name')
+            .eq('user_id', history.changed_by)
+            .single()
+          
+          if (vendor) {
+            return { ...history, changed_by_user: { type: 'vendor', name: vendor.vendor_name } }
+          }
+          
+          return history
+        })
+      )
+      
+      completeOrder.status_history = statusHistoryWithUsers
+    }
+
+    return NextResponse.json(completeOrder)
   } catch (error) {
     console.error('Error in PATCH /api/purchase-orders/[id]:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -346,9 +490,19 @@ export async function PUT(request, { params }) {
           id,
           vendor_code,
           vendor_name,
+          vendor_email,
+          vendor_phone,
           email,
           address,
-          contact_name
+          contact_name,
+          contact_person,
+          address_line1,
+          address_line2,
+          city,
+          state,
+          zip_code,
+          country,
+          tax_id
         ),
         items:purchase_order_items(
           id,

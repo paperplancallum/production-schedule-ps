@@ -99,23 +99,9 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
 
       if (response.ok) {
         const updatedOrder = await response.json()
-        
-        // Fetch updated order with status history
-        const historyResponse = await fetch(`/api/purchase-orders/${order.id}`)
-        if (historyResponse.ok) {
-          const fullOrder = await historyResponse.json()
-          setOrder(fullOrder)
-          toast.success('Status updated successfully')
-        } else {
-          // Still update with what we have
-          setOrder({
-            ...order,
-            status: updatedOrder.status,
-            goods_ready_date: updatedOrder.goods_ready_date,
-            updated_at: updatedOrder.updated_at
-          })
-          toast.success('Status updated')
-        }
+        // The PATCH endpoint now returns the complete order with status history
+        setOrder(updatedOrder)
+        toast.success('Status updated successfully')
       } else {
         const error = await response.json()
         toast.error(`Error updating status: ${error.error}`)
@@ -141,22 +127,9 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
 
       if (response.ok) {
         const updatedOrder = await response.json()
-        
-        // Fetch updated order with status history
-        const historyResponse = await fetch(`/api/purchase-orders/${order.id}`)
-        if (historyResponse.ok) {
-          const fullOrder = await historyResponse.json()
-          setOrder(fullOrder)
-          toast.success('Goods ready date updated successfully')
-        } else {
-          // Still update with what we have
-          setOrder({
-            ...order,
-            goods_ready_date: updatedOrder.goods_ready_date,
-            updated_at: updatedOrder.updated_at
-          })
-          toast.success('Goods ready date updated')
-        }
+        // The PATCH endpoint now returns the complete order with status history
+        setOrder(updatedOrder)
+        toast.success('Goods ready date updated successfully')
       } else {
         const error = await response.json()
         toast.error(`Error updating goods ready date: ${error.error}`)
