@@ -277,7 +277,7 @@ export async function PATCH(request, { params }) {
     }
 
     // Fetch the complete order with status history after updates
-    const { data: completeOrder, error: fetchError } = await supabase
+    const { data: completeOrder, error: fetchCompleteError } = await supabase
       .from('purchase_orders')
       .select(`
         *,
@@ -352,8 +352,8 @@ export async function PATCH(request, { params }) {
       .eq('id', id)
       .single()
 
-    if (fetchError) {
-      console.error('Error fetching complete order:', fetchError)
+    if (fetchCompleteError) {
+      console.error('Error fetching complete order:', fetchCompleteError)
       // Return the basic update data if we can't fetch the complete order
       return NextResponse.json(data)
     }
