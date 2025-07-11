@@ -17,29 +17,21 @@ export default async function PurchaseOrderPage({ params }) {
     notFound()
   }
 
-  // Fetch supplier details separately with all fields
-  const { data: supplier } = await supabase
+  // Fetch supplier details separately with only existing fields
+  const { data: supplier, error: supplierError } = await supabase
     .from('vendors')
-    .select(`
-      id, 
-      vendor_name, 
-      vendor_type, 
-      vendor_email,
-      vendor_phone,
-      contact_person,
-      address_line1,
-      address_line2,
-      city,
-      state,
-      zip_code,
-      country,
-      tax_id,
-      email,
-      contact_name,
-      address
-    `)
+    .select('*')  // Get all fields to avoid column name issues
     .eq('id', order.supplier_id)
     .single()
+  
+  // Log error if any
+  if (supplierError) {
+    console.error('Failed to fetch supplier:', {
+      error: supplierError,
+      supplier_id: order.supplier_id,
+      order_id: order.id
+    })
+  }
   
   // If supplier not found, use a default object
   // Map the correct field names for the component
@@ -47,8 +39,8 @@ export default async function PurchaseOrderPage({ params }) {
     id: supplier.id,
     vendor_name: supplier.vendor_name,
     vendor_type: supplier.vendor_type,
-    vendor_email: supplier.vendor_email || supplier.email || '',
-    vendor_phone: supplier.vendor_phone || '',
+    vendor_email: supplier.email || '',
+    vendor_phone: '',  // vendor_phone doesn't exist in table
     contact_person: supplier.contact_person || supplier.contact_name || '',
     address_line1: supplier.address_line1 || '',
     address_line2: supplier.address_line2 || '',
