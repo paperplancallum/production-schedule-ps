@@ -393,6 +393,12 @@ export async function PATCH(request, { params }) {
       completeOrder.status_history = statusHistoryWithUsers
     }
 
+    console.log('PATCH returning complete order:', {
+      id: completeOrder.id,
+      status: completeOrder.status,
+      status_history_count: completeOrder.status_history?.length || 0
+    })
+
     return NextResponse.json(completeOrder)
   } catch (error) {
     console.error('Error in PATCH /api/purchase-orders/[id]:', error)

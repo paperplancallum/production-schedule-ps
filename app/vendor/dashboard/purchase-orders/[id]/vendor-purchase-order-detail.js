@@ -129,6 +129,8 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
 
       if (response.ok) {
         const updatedOrder = await response.json()
+        console.log('Vendor - Updated order from goods ready date PATCH:', updatedOrder)
+        console.log('Vendor - Status history after date update:', updatedOrder.status_history)
         // The PATCH endpoint now returns the complete order with status history
         setOrder(updatedOrder)
         toast.success('Goods ready date updated successfully')
@@ -464,6 +466,11 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
           </Card>
 
           {/* Status History */}
+          {console.log('Vendor - Checking status history render:', {
+            has_status_history: !!order.status_history,
+            status_history_length: order.status_history?.length || 0,
+            should_render: order.status_history && order.status_history.length > 0
+          })}
           {order.status_history && order.status_history.length > 0 && (
             <Card>
               <CardHeader>
