@@ -99,6 +99,28 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
     }
 
+    // Check if user is either the seller or the supplier
+    let hasPermission = false
+    if (existingOrder.seller_id === user.id) {
+      hasPermission = true
+    } else {
+      // Check if user is the supplier
+      const { data: vendor } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('id', existingOrder.supplier_id)
+        .eq('user_id', user.id)
+        .single()
+      
+      if (vendor) {
+        hasPermission = true
+      }
+    }
+
+    if (!hasPermission) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
     // Validate status transitions
     if (body.status) {
       const validTransitions = {

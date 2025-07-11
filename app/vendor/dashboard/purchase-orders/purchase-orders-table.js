@@ -6,18 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { FileText, Eye, CheckCircle, Truck, Package } from 'lucide-react'
+import { FileText, Eye, CheckCircle, Truck, Package, Factory, Calendar, Clock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-
-const statusConfig = {
-  draft: { label: 'Draft', color: 'secondary' },
-  sent_to_supplier: { label: 'Sent To Supplier', color: 'blue' },
-  approved: { label: 'Approved', color: 'green' },
-  in_progress: { label: 'In Progress', color: 'yellow' },
-  complete: { label: 'Complete', color: 'green' },
-  cancelled: { label: 'Cancelled', color: 'destructive' }
-}
+import { vendorStatusConfig, getVendorStatus, getSellerStatus, getVendorStatusTransitions } from '@/lib/vendor-status-mapping'
 
 export default function PurchaseOrdersTable({ vendorId }) {
   const router = useRouter()
@@ -59,13 +51,16 @@ export default function PurchaseOrdersTable({ vendorId }) {
     }).format(amount || 0)
   }
 
-  const handleStatusUpdate = async (orderId, newStatus) => {
+  const handleStatusUpdate = async (orderId, newVendorStatus) => {
     setUpdating(orderId)
     try {
+      // Convert vendor status to seller status for database update
+      const sellerStatus = getSellerStatus(newVendorStatus)
+      
       const response = await fetch(`/api/purchase-orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ status: sellerStatus })
       })
 
       if (response.ok) {
@@ -73,25 +68,37 @@ export default function PurchaseOrdersTable({ vendorId }) {
       } else {
         const data = await response.json()
         console.error('Error updating status:', data.error)
+        alert(`Error updating status: ${data.error}`)
       }
     } catch (error) {
       console.error('Error updating status:', error)
+      alert('Failed to update status')
     } finally {
       setUpdating(null)
     }
   }
 
-  const getAvailableStatusTransitions = (currentStatus) => {
-    const transitions = {
-      'sent_to_supplier': ['approved', 'cancelled'],
-      'approved': ['in_progress'],
-      'in_progress': ['complete']
-    }
-    return transitions[currentStatus] || []
-  }
-
   const handleViewOrder = (orderId) => {
     router.push(`/vendor/dashboard/purchase-orders/${orderId}`)
+  }
+
+  const getStatusIcon = (vendorStatus) => {
+    switch (vendorStatus) {
+      case 'to_approve':
+        return Clock
+      case 'approved':
+        return CheckCircle
+      case 'in_production':
+        return Factory
+      case 'production_finished':
+        return Package
+      case 'scheduled_for_pickup':
+        return Calendar
+      case 'picked_up':
+        return Truck
+      default:
+        return FileText
+    }
   }
 
   return (
@@ -117,7 +124,7 @@ export default function PurchaseOrdersTable({ vendorId }) {
             No purchase orders yet
           </h3>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            You'll see purchase orders from your seller here
+            You'll see purchase orders from your sellers here
           </p>
         </div>
       ) : (
@@ -135,8 +142,10 @@ export default function PurchaseOrdersTable({ vendorId }) {
           </TableHeader>
           <TableBody>
             {orders.map((order) => {
-              const availableTransitions = getAvailableStatusTransitions(order.status)
+              const vendorStatus = getVendorStatus(order.status)
+              const availableTransitions = getVendorStatusTransitions(vendorStatus)
               const isUpdating = updating === order.id
+              const StatusIcon = getStatusIcon(vendorStatus)
               
               return (
                 <TableRow key={order.id}>
@@ -146,8 +155,9 @@ export default function PurchaseOrdersTable({ vendorId }) {
                   <TableCell>{order.items?.length || 0}</TableCell>
                   <TableCell>{formatCurrency(order.total_amount)}</TableCell>
                   <TableCell>
-                    <Badge variant={statusConfig[order.status]?.color}>
-                      {statusConfig[order.status]?.label}
+                    <Badge variant={vendorStatusConfig[vendorStatus]?.color}>
+                      <StatusIcon className="h-3 w-3 mr-1" />
+                      {vendorStatusConfig[vendorStatus]?.label}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -166,18 +176,21 @@ export default function PurchaseOrdersTable({ vendorId }) {
                           onValueChange={(value) => handleStatusUpdate(order.id, value)}
                           disabled={isUpdating}
                         >
-                          <SelectTrigger className="w-32" disabled={isUpdating}>
+                          <SelectTrigger className="w-40" disabled={isUpdating}>
                             <SelectValue placeholder={isUpdating ? 'Updating...' : 'Update'} />
                           </SelectTrigger>
                           <SelectContent>
-                            {availableTransitions.map(status => (
-                              <SelectItem key={status} value={status}>
-                                {status === 'approved' && <CheckCircle className="h-4 w-4 mr-2 inline" />}
-                                {status === 'in_progress' && <Package className="h-4 w-4 mr-2 inline" />}
-                                {status === 'complete' && <CheckCircle className="h-4 w-4 mr-2 inline" />}
-                                {statusConfig[status]?.label}
-                              </SelectItem>
-                            ))}
+                            {availableTransitions.map(status => {
+                              const Icon = getStatusIcon(status)
+                              return (
+                                <SelectItem key={status} value={status}>
+                                  <div className="flex items-center">
+                                    <Icon className="h-4 w-4 mr-2" />
+                                    {vendorStatusConfig[status]?.label}
+                                  </div>
+                                </SelectItem>
+                              )
+                            })}
                           </SelectContent>
                         </Select>
                       )}
