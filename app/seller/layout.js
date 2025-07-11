@@ -8,7 +8,8 @@ import {
   ShoppingCart, 
   Settings, 
   Users,
-  LogOut
+  LogOut,
+  ClipboardCheck
 } from 'lucide-react'
 
 export default async function SellerLayout({ children }) {
@@ -60,6 +61,11 @@ export default async function SellerLayout({ children }) {
       name: 'Vendors',
       href: '/seller/vendors',
       icon: Users
+    },
+    {
+      name: 'Inspections',
+      href: '/seller/inspections',
+      icon: ClipboardCheck
     },
     {
       name: 'Settings',
