@@ -239,57 +239,69 @@ export default function TransfersPage() {
         return
       }
       
-      // Generate transfer number
-      const transferNumber = `TRF-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
+      // Create a separate transfer for each SKU (ledger style)
+      const transfers = []
+      let successCount = 0
+      let totalQuantity = 0
       
-      // Create instant transfer data
-      const transferData = {
-        transfer_number: transferNumber,
-        transfer_type: 'in',
-        purchase_order_id: poData.id, // Use the actual PO ID, not the number
-        purchase_order_number: poNumber,
-        from_location: poData.supplier?.vendor_name || 'Supplier',
-        from_location_type: 'supplier',
-        to_location: `${poData.supplier?.vendor_name || 'Supplier'} Warehouse`,
-        to_location_type: 'supplier_warehouse',
-        status: 'arrived', // Instant transfer - already arrived
-        actual_arrival: new Date().toISOString(),
-        notes: `Inventory received from Purchase Order: ${poNumber}`,
-        items: poData.items?.map(item => ({
-          sku: item.product?.sku || 'Unknown',
-          product_name: item.product?.product_name || 'Unknown Product',
-          quantity: item.quantity
-        })) || []
+      for (const item of (poData.items || [])) {
+        const transferNumber = `TRF-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
+        
+        const transferData = {
+          transfer_number: transferNumber,
+          transfer_type: 'in',
+          purchase_order_id: poData.id,
+          purchase_order_number: poNumber,
+          from_location: poData.supplier?.vendor_name || 'Supplier',
+          from_location_type: 'supplier',
+          to_location: `${poData.supplier?.vendor_name || 'Supplier'} Warehouse`,
+          to_location_type: 'supplier_warehouse',
+          status: 'arrived',
+          actual_arrival: new Date().toISOString(),
+          notes: `Received ${item.product?.sku || 'Unknown SKU'} from PO: ${poNumber}`,
+          items: [{
+            sku: item.product?.sku || 'Unknown',
+            product_name: item.product?.product_name || 'Unknown Product',
+            quantity: item.quantity,
+            unit: item.product?.unit_of_measure || 'units'
+          }]
+        }
+        
+        try {
+          // Save each transfer to database
+          const response = await fetch('/api/transfers', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(transferData)
+          })
+
+          if (!response.ok) {
+            const error = await response.json()
+            console.error(`Failed to create transfer for ${item.product?.sku}:`, error)
+          } else {
+            successCount++
+            totalQuantity += item.quantity
+            transfers.push(await response.json())
+          }
+        } catch (error) {
+          console.error(`Error creating transfer for ${item.product?.sku}:`, error)
+        }
       }
       
-      // In a real implementation, this would save to the database
-      // For now, show success message
-      const totalQuantity = transferData.items.reduce((sum, item) => sum + item.quantity, 0)
-      
-      toast.success(
-        `Inventory received successfully! Transfer ${transferNumber} created with ${transferData.items.length} items (${totalQuantity} units) at ${transferData.to_location}.`
-      )
-      
-      // Save to database
-      const response = await fetch('/api/transfers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(transferData)
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create transfer')
+      if (successCount > 0) {
+        toast.success(
+          `Inventory received successfully! Created ${successCount} transfer${successCount > 1 ? 's' : ''} (${totalQuantity} total units) at ${poData.supplier?.vendor_name || 'Supplier'} Warehouse.`
+        )
+        
+        // Reload transfers to update the UI
+        loadTransfers()
+      } else {
+        toast.error('Failed to create any transfers')
       }
-
-      const createdTransfer = await response.json()
-      
-      // Reload transfers to update the UI
-      loadTransfers()
     } catch (error) {
-      console.error('Error creating instant transfer:', error)
+      console.error('Error creating instant transfers:', error)
       toast.error('Failed to receive inventory')
     }
   }
@@ -517,7 +529,7 @@ export default function TransfersPage() {
               <TableHead>Type</TableHead>
               <TableHead>From</TableHead>
               <TableHead>To</TableHead>
-              <TableHead>Items</TableHead>
+              <TableHead>SKU / Quantity</TableHead>
               <TableHead>Est. Arrival</TableHead>
               <TableHead>Tracking</TableHead>
               <TableHead>Status</TableHead>
@@ -613,11 +625,15 @@ export default function TransfersPage() {
                     </TableCell>
                     <TableCell onClick={() => handleRowClick(transfer.id)}>
                       <div className="text-sm">
-                        {transfer.items?.length || 0} items
-                        {transfer.items && transfer.items.length > 0 && (
-                          <div className="text-xs text-slate-500">
-                            {transfer.items.reduce((sum, item) => sum + item.quantity, 0)} units
-                          </div>
+                        {transfer.items && transfer.items.length > 0 ? (
+                          <>
+                            <div className="font-medium">{transfer.items[0].sku}</div>
+                            <div className="text-xs text-slate-500">
+                              {transfer.items[0].quantity} {transfer.items[0].unit || 'units'}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-slate-400">No items</span>
                         )}
                       </div>
                     </TableCell>
@@ -806,23 +822,28 @@ export default function TransfersPage() {
               {formData.items && formData.items.length > 0 && (
                 <div className="col-span-2 space-y-2">
                   <Label>Items to Transfer</Label>
-                  <div className="border rounded-md p-4 space-y-2 max-h-48 overflow-y-auto">
-                    {formData.items.map((item, index) => (
-                      <div key={index} className="flex justify-between items-center text-sm">
-                        <div>
-                          <span className="font-medium">{item.sku}</span>
-                          <span className="text-muted-foreground ml-2">- {item.product_name}</span>
+                  <div className="border rounded-md p-4">
+                    <div className="text-sm text-muted-foreground mb-2">
+                      Note: Each SKU will create a separate transfer entry
+                    </div>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {formData.items.map((item, index) => (
+                        <div key={index} className="flex justify-between items-center text-sm p-2 bg-slate-50 dark:bg-slate-900 rounded">
+                          <div>
+                            <span className="font-medium">{item.sku}</span>
+                            <span className="text-muted-foreground ml-2">- {item.product_name}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-medium">{item.quantity}</span>
+                            <span className="text-muted-foreground ml-1">{item.unit}</span>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="font-medium">{item.quantity}</span>
-                          <span className="text-muted-foreground ml-1">{item.unit}</span>
+                      ))}
+                      <div className="border-t pt-2 mt-2">
+                        <div className="flex justify-between items-center font-medium">
+                          <span>Total Transfers to Create:</span>
+                          <span>{formData.items.length}</span>
                         </div>
-                      </div>
-                    ))}
-                    <div className="border-t pt-2 mt-2">
-                      <div className="flex justify-between items-center font-medium">
-                        <span>Total Items:</span>
-                        <span>{formData.items.reduce((sum, item) => sum + item.quantity, 0)} units</span>
                       </div>
                     </div>
                   </div>
