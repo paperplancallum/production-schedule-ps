@@ -1,58 +1,65 @@
 'use client'
 
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { 
-  ArrowLeft, 
   FileText, 
+  Download, 
+  Mail, 
   Package, 
   Truck, 
   CheckCircle, 
-  XCircle, 
-  Clock,
+  XCircle,
+  Calendar,
+  User,
+  Building,
+  Phone,
+  MapPin,
+  DollarSign,
+  Hash,
   Edit,
-  Save,
-  X,
-  Download,
-  Mail
+  Clock,
+  AlertCircle
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-
-const statusConfig = {
-  draft: { label: 'Draft', color: 'secondary', icon: FileText },
-  sent_to_supplier: { label: 'Sent To Supplier', color: 'blue', icon: Clock },
-  approved: { label: 'Approved', color: 'green', icon: CheckCircle },
-  in_progress: { label: 'In Progress', color: 'yellow', icon: Package },
-  complete: { label: 'Complete', color: 'green', icon: CheckCircle },
-  cancelled: { label: 'Cancelled', color: 'destructive', icon: XCircle }
-}
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { formatCurrency } from '@/lib/utils'
+import jsPDF from 'jspdf'
 
 export default function PurchaseOrderDetail({ order: initialOrder }) {
   const router = useRouter()
   const [order, setOrder] = useState(initialOrder)
-  const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [notes, setNotes] = useState(order.notes || '')
 
-  const StatusIcon = statusConfig[order.status]?.icon || FileText
-
-  const formatDate = (date) => {
-    if (!date) return '-'
-    return new Date(date).toLocaleDateString()
+  const statusConfig = {
+    draft: { label: 'Draft', color: 'secondary', icon: FileText },
+    sent_to_supplier: { label: 'Sent To Supplier', color: 'blue', icon: Mail },
+    approved: { label: 'Approved', color: 'green', icon: CheckCircle },
+    in_progress: { label: 'In Progress', color: 'yellow', icon: Package },
+    complete: { label: 'Complete', color: 'green', icon: CheckCircle },
+    cancelled: { label: 'Cancelled', color: 'destructive', icon: XCircle }
   }
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount || 0)
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  }
+
+  const formatDateTime = (date) => {
+    return new Date(date).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
   const handleStatusUpdate = async (newStatus) => {
@@ -60,51 +67,33 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
     try {
       const response = await fetch(`/api/purchase-orders/${order.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ status: newStatus })
       })
 
       if (response.ok) {
         const updatedOrder = await response.json()
-        setOrder(updatedOrder)
-        router.refresh()
+        setOrder({
+          ...order,
+          status: updatedOrder.status,
+          updated_at: updatedOrder.updated_at
+        })
       } else {
-        const data = await response.json()
-        console.error('Error updating status:', data.error)
+        const error = await response.json()
+        alert(`Error updating status: ${error.error}`)
       }
     } catch (error) {
       console.error('Error updating status:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSaveNotes = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/purchase-orders/${order.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes })
-      })
-
-      if (response.ok) {
-        const updatedOrder = await response.json()
-        setOrder(updatedOrder)
-        setEditing(false)
-      } else {
-        const data = await response.json()
-        console.error('Error updating notes:', data.error)
-      }
-    } catch (error) {
-      console.error('Error updating notes:', error)
+      alert('Failed to update status')
     } finally {
       setLoading(false)
     }
   }
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this purchase order? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to delete this purchase order?')) {
       return
     }
 
@@ -117,21 +106,21 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
       if (response.ok) {
         router.push('/seller/purchase-orders')
       } else {
-        const data = await response.json()
-        console.error('Error deleting order:', data.error)
-        alert(data.error || 'Failed to delete order')
+        const error = await response.json()
+        alert(`Error deleting order: ${error.error}`)
       }
     } catch (error) {
       console.error('Error deleting order:', error)
+      alert('Failed to delete order')
     } finally {
       setLoading(false)
     }
   }
 
-  const getAvailableTransitions = () => {
+  const getNextStatuses = () => {
     const transitions = {
-      'draft': [], // Removed 'sent_to_supplier' - will be done via email
-      'sent_to_supplier': ['approved'], // Supplier confirms from their dashboard
+      'draft': ['sent_to_supplier'],
+      'sent_to_supplier': ['approved'],
       'approved': ['in_progress'],
       'in_progress': ['complete'],
       'complete': [],
@@ -148,24 +137,140 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
   const handleDownloadPDF = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/purchase-orders/${order.id}/pdf`)
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `PO-${order.po_number}.pdf`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-      } else {
-        console.error('Error downloading PDF')
-        alert('Failed to download PDF')
+      const pdf = new jsPDF()
+      
+      // Set up the document
+      pdf.setFontSize(20)
+      pdf.text('PURCHASE ORDER', 105, 20, { align: 'center' })
+      
+      pdf.setFontSize(12)
+      pdf.text(`PO Number: ${order.po_number}`, 105, 30, { align: 'center' })
+      pdf.text(`Date: ${formatDate(order.created_at)}`, 105, 38, { align: 'center' })
+      pdf.text(`Status: ${order.status.replace(/_/g, ' ').toUpperCase()}`, 105, 46, { align: 'center' })
+      if (order.trade_terms) {
+        pdf.text(`Trade Terms: ${order.trade_terms}`, 105, 54, { align: 'center' })
       }
+      
+      // Add a line
+      pdf.setLineWidth(0.5)
+      pdf.line(20, 60, 190, 60)
+      
+      // Buyer and Supplier info
+      let yPos = 70
+      pdf.setFontSize(14)
+      pdf.setFont(undefined, 'bold')
+      pdf.text('FROM (BUYER)', 20, yPos)
+      pdf.text('TO (SUPPLIER)', 110, yPos)
+      
+      pdf.setFontSize(11)
+      pdf.setFont(undefined, 'normal')
+      yPos += 8
+      
+      // Buyer info
+      const seller = order.seller || {}
+      pdf.text(seller.company_name || 'Company Name', 20, yPos)
+      yPos += 6
+      if (seller.address) {
+        pdf.text(seller.address, 20, yPos)
+        yPos += 6
+      }
+      if (seller.email) {
+        pdf.text(`Email: ${seller.email}`, 20, yPos)
+        yPos += 6
+      }
+      if (seller.phone_number) {
+        pdf.text(`Phone: ${seller.phone_number}`, 20, yPos)
+      }
+      
+      // Supplier info
+      yPos = 78
+      const supplier = order.supplier || {}
+      pdf.text(supplier.vendor_name || 'Unknown Supplier', 110, yPos)
+      yPos += 6
+      if (supplier.address) {
+        pdf.text(supplier.address, 110, yPos)
+        yPos += 6
+      }
+      if (supplier.vendor_email) {
+        pdf.text(`Email: ${supplier.vendor_email}`, 110, yPos)
+        yPos += 6
+      }
+      if (supplier.contact_name) {
+        pdf.text(`Contact: ${supplier.contact_name}`, 110, yPos)
+      }
+      
+      // Items table
+      yPos = 120
+      pdf.setFontSize(12)
+      pdf.setFont(undefined, 'bold')
+      
+      // Table headers
+      pdf.text('SKU', 20, yPos)
+      pdf.text('Product', 45, yPos)
+      pdf.text('Qty', 110, yPos)
+      pdf.text('UOM', 125, yPos)
+      pdf.text('Unit Price', 145, yPos)
+      pdf.text('Total', 175, yPos)
+      
+      pdf.line(20, yPos + 2, 190, yPos + 2)
+      
+      // Table rows
+      pdf.setFont(undefined, 'normal')
+      yPos += 8
+      
+      let subtotal = 0
+      ;(order.items || []).forEach(item => {
+        const product = item.product || {}
+        const lineTotal = item.quantity * item.unit_price
+        subtotal += lineTotal
+        
+        pdf.text(product.sku || '', 20, yPos)
+        pdf.text(product.product_name || '', 45, yPos)
+        pdf.text(item.quantity.toString(), 110, yPos)
+        pdf.text(product.unit_of_measure || 'units', 125, yPos)
+        pdf.text(`$${item.unit_price.toFixed(2)}`, 145, yPos)
+        pdf.text(`$${lineTotal.toFixed(2)}`, 175, yPos)
+        
+        yPos += 8
+      })
+      
+      // Totals
+      pdf.line(140, yPos, 190, yPos)
+      yPos += 8
+      pdf.text('Subtotal:', 140, yPos)
+      pdf.text(`$${(order.subtotal || subtotal).toFixed(2)}`, 175, yPos)
+      
+      yPos += 8
+      pdf.setFont(undefined, 'bold')
+      pdf.text('Total:', 140, yPos)
+      pdf.text(`$${(order.total_amount || subtotal).toFixed(2)}`, 175, yPos)
+      
+      // Notes
+      if (order.notes) {
+        yPos += 20
+        pdf.setFont(undefined, 'bold')
+        pdf.text('Notes:', 20, yPos)
+        pdf.setFont(undefined, 'normal')
+        yPos += 8
+        
+        // Split notes into lines if too long
+        const lines = pdf.splitTextToSize(order.notes, 170)
+        lines.forEach(line => {
+          pdf.text(line, 20, yPos)
+          yPos += 6
+        })
+      }
+      
+      // Footer
+      pdf.setFontSize(10)
+      pdf.setTextColor(128)
+      pdf.text(`Generated on ${formatDateTime(new Date())}`, 105, 280, { align: 'center' })
+      
+      // Save the PDF
+      pdf.save(`PO-${order.po_number}.pdf`)
     } catch (error) {
-      console.error('Error downloading PDF:', error)
-      alert('Failed to download PDF')
+      console.error('Error generating PDF:', error)
+      alert('Failed to generate PDF')
     } finally {
       setLoading(false)
     }
@@ -185,18 +290,19 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
     await handleStatusUpdate('cancelled')
   }
 
+  const StatusIcon = statusConfig[order.status]?.icon || FileText
+  const nextStatuses = getNextStatuses()
+
   return (
-    <div className="p-6">
+    <div className="container mx-auto p-6 max-w-7xl">
       {/* Header */}
       <div className="mb-6">
-        <Button
-          variant="ghost"
-          onClick={() => router.push('/seller/purchase-orders')}
-          className="mb-4"
+        <Link 
+          href="/seller/purchase-orders" 
+          className="text-blue-600 hover:text-blue-800 mb-4 inline-block"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Purchase Orders
-        </Button>
+          ← Back to Purchase Orders
+        </Link>
 
         <div className="flex justify-between items-start">
           <div>
@@ -251,134 +357,55 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
               <CardTitle>Order Items</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
-                    <TableHead className="text-right">Unit Price</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {order.items?.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{item.product.product_name}</div>
-                          {item.notes && (
-                            <div className="text-sm text-gray-500">{item.notes}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{item.product.sku}</TableCell>
-                      <TableCell className="text-right">
-                        {item.quantity} {item.product.unit_of_measure}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(item.unit_price)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(item.line_total)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              <div className="mt-4 space-y-2 text-right">
-                <div className="flex justify-end gap-4">
-                  <span className="text-gray-500">Subtotal:</span>
-                  <span className="font-medium">{formatCurrency(order.subtotal)}</span>
-                </div>
-                <div className="flex justify-end gap-4 text-lg font-semibold pt-2 border-t">
-                  <span>Total:</span>
-                  <span>{formatCurrency(order.total_amount)}</span>
-                </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-2">SKU</th>
+                      <th className="text-left py-3 px-2">Product</th>
+                      <th className="text-right py-3 px-2">Quantity</th>
+                      <th className="text-left py-3 px-2">UOM</th>
+                      <th className="text-right py-3 px-2">Unit Price</th>
+                      <th className="text-right py-3 px-2">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.items?.map((item) => (
+                      <tr key={item.id} className="border-b">
+                        <td className="py-3 px-2 text-sm">{item.product?.sku}</td>
+                        <td className="py-3 px-2">
+                          <div>
+                            <div className="font-medium">{item.product?.product_name}</div>
+                            {item.product?.description && (
+                              <div className="text-sm text-gray-500">{item.product.description}</div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-2 text-right">{item.quantity}</td>
+                        <td className="py-3 px-2">{item.product?.unit_of_measure || 'units'}</td>
+                        <td className="py-3 px-2 text-right">{formatCurrency(item.unit_price)}</td>
+                        <td className="py-3 px-2 text-right font-medium">
+                          {formatCurrency(item.quantity * item.unit_price)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan="5" className="py-3 px-2 text-right font-medium">Subtotal:</td>
+                      <td className="py-3 px-2 text-right font-medium">
+                        {formatCurrency(order.subtotal || 0)}
+                      </td>
+                    </tr>
+                    <tr className="border-t-2">
+                      <td colSpan="5" className="py-3 px-2 text-right font-bold text-lg">Total:</td>
+                      <td className="py-3 px-2 text-right font-bold text-lg">
+                        {formatCurrency(order.total_amount || 0)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Order Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Order Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm text-gray-500">PO Number</Label>
-                  <p className="font-medium">{order.po_number}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Order Date</Label>
-                  <p className="font-medium">{formatDate(order.created_at)}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Trade Terms</Label>
-                  <p className="font-medium">{order.trade_terms || 'FOB'}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Requested Delivery</Label>
-                  <p className="font-medium">{formatDate(order.requested_delivery_date) || 'Not specified'}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Notes */}
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>Notes</CardTitle>
-                {!editing && order.status === 'draft' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditing(true)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {editing ? (
-                <div className="space-y-4">
-                  <Textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={4}
-                    placeholder="Add notes for the supplier..."
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={handleSaveNotes}
-                      disabled={loading}
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Save
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setNotes(order.notes || '')
-                        setEditing(false)
-                      }}
-                      disabled={loading}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-gray-600 whitespace-pre-wrap">
-                  {order.notes || 'No notes added'}
-                </p>
-              )}
             </CardContent>
           </Card>
 
@@ -386,32 +413,31 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
           {order.status_history && order.status_history.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Status History</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Status History
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {order.status_history.map((history) => (
-                    <div key={history.id} className="flex items-start gap-3 text-sm">
-                      <div className="text-gray-500 min-w-[140px]">
-                        {formatDate(history.created_at)}
-                      </div>
-                      <div className="flex-1">
+                  {order.status_history.map((history, index) => (
+                    <div key={history.id} className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          {history.from_status && (
-                            <>
-                              <Badge variant="outline" className="text-xs">
-                                {statusConfig[history.from_status]?.label}
-                              </Badge>
-                              <span className="text-gray-500">→</span>
-                            </>
-                          )}
+                          <Badge variant="outline" className="text-xs">
+                            {history.from_status?.replace(/_/g, ' ') || 'Created'}
+                          </Badge>
+                          <span className="text-gray-500">→</span>
                           <Badge variant={statusConfig[history.to_status]?.color} className="text-xs">
                             {statusConfig[history.to_status]?.label}
                           </Badge>
                         </div>
                         {history.notes && (
-                          <p className="text-gray-600 mt-1">{history.notes}</p>
+                          <p className="text-sm text-gray-600 mt-1">{history.notes}</p>
                         )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          {formatDateTime(history.created_at)}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -423,97 +449,115 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Status Actions */}
-          {getAvailableTransitions().length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Update Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Select
-                  value=""
-                  onValueChange={handleStatusUpdate}
-                  disabled={loading}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Change status..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAvailableTransitions().map(status => (
-                      <SelectItem key={status} value={status}>
-                        {statusConfig[status]?.label}
+          {/* Order Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Order Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {nextStatuses.length > 0 && (
+                <div>
+                  <Label>Update Status</Label>
+                  <Select 
+                    value={order.status} 
+                    onValueChange={handleStatusUpdate}
+                    disabled={loading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={order.status} disabled>
+                        {statusConfig[order.status]?.label} (Current)
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Cancel Order */}
-          {canBeCancelled() && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Cancel Order</CardTitle>
-                <CardDescription>
-                  This action cannot be undone
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  variant="destructive"
+                      {nextStatuses.map(status => (
+                        <SelectItem key={status} value={status}>
+                          {statusConfig[status]?.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {canBeCancelled() && (
+                <Button 
+                  variant="destructive" 
+                  className="w-full"
                   onClick={handleCancelOrder}
                   disabled={loading}
-                  className="w-full"
                 >
                   <XCircle className="h-4 w-4 mr-2" />
-                  Cancel Purchase Order
+                  Cancel Order
                 </Button>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
 
           {/* Supplier Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Supplier Information</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="h-5 w-5" />
+                Supplier Information
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Label className="text-sm text-gray-500">Company</Label>
-                <p className="font-medium">{order.supplier?.vendor_name || 'Unknown'}</p>
+                <p className="text-sm text-gray-500">Name</p>
+                <p className="font-medium">{order.supplier?.vendor_name || 'N/A'}</p>
               </div>
-              <div>
-                <Label className="text-sm text-gray-500">Email</Label>
-                <p className="font-medium">{order.supplier?.vendor_email || '-'}</p>
-              </div>
+              {order.supplier?.vendor_email && (
+                <div>
+                  <p className="text-sm text-gray-500">Email</p>
+                  <p className="font-medium">{order.supplier.vendor_email}</p>
+                </div>
+              )}
+              {order.supplier?.contact_name && (
+                <div>
+                  <p className="text-sm text-gray-500">Contact Person</p>
+                  <p className="font-medium">{order.supplier.contact_name}</p>
+                </div>
+              )}
               {order.supplier?.vendor_phone && (
                 <div>
-                  <Label className="text-sm text-gray-500">Phone</Label>
-                  <p className="font-medium">{order.supplier?.vendor_phone}</p>
+                  <p className="text-sm text-gray-500">Phone</p>
+                  <p className="font-medium">{order.supplier.vendor_phone}</p>
+                </div>
+              )}
+              {order.supplier?.address && (
+                <div>
+                  <p className="text-sm text-gray-500">Address</p>
+                  <p className="font-medium">{order.supplier.address}</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Delivery Information */}
+          {/* Order Details */}
           <Card>
             <CardHeader>
-              <CardTitle>Delivery Information</CardTitle>
+              <CardTitle>Order Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Label className="text-sm text-gray-500">Order Date</Label>
-                <p className="font-medium">{formatDate(order.order_date)}</p>
+                <p className="text-sm text-gray-500">PO Number</p>
+                <p className="font-medium">{order.po_number}</p>
               </div>
               <div>
-                <Label className="text-sm text-gray-500">Requested Delivery</Label>
-                <p className="font-medium">{formatDate(order.requested_delivery_date)}</p>
+                <p className="text-sm text-gray-500">Order Date</p>
+                <p className="font-medium">{formatDate(order.created_at)}</p>
               </div>
-              {order.actual_delivery_date && (
+              {order.trade_terms && (
                 <div>
-                  <Label className="text-sm text-gray-500">Actual Delivery</Label>
-                  <p className="font-medium">{formatDate(order.actual_delivery_date)}</p>
+                  <p className="text-sm text-gray-500">Trade Terms</p>
+                  <p className="font-medium">{order.trade_terms}</p>
+                </div>
+              )}
+              {order.notes && (
+                <div>
+                  <p className="text-sm text-gray-500">Notes</p>
+                  <p className="font-medium">{order.notes}</p>
                 </div>
               )}
             </CardContent>
