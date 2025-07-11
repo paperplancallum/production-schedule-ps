@@ -141,3 +141,39 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export async function DELETE(request) {
+  const supabase = await createClient()
+  
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'Transfer ID required' }, { status: 400 })
+    }
+
+    // Delete the transfer (items will be cascade deleted)
+    const { error } = await supabase
+      .from('transfers')
+      .delete()
+      .eq('id', id)
+      .eq('seller_id', user.id)
+
+    if (error) {
+      console.error('Error deleting transfer:', error)
+      return NextResponse.json({ error: 'Failed to delete transfer' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 })
+  } catch (error) {
+    console.error('Error in transfers DELETE:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

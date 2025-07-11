@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, Search, Package, Truck, CheckCircle, XCircle, Clock, ArrowRight, Building, Warehouse } from 'lucide-react'
+import { Plus, Search, Package, Truck, CheckCircle, XCircle, Clock, ArrowRight, Building, Warehouse, Trash2, MoreHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -22,6 +22,12 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const statusConfig = {
   pending: { label: 'Pending', color: 'secondary', icon: Clock },
@@ -80,7 +86,7 @@ export default function TransfersPage() {
     loadTransfers()
   }, [statusFilter])
 
-  const [isCreatingTransfer, setIsCreatingTransfer] = useState(false)
+  const hasProcessedRef = useRef(false)
 
   useEffect(() => {
     // Check for transfer creation from PO
@@ -89,7 +95,10 @@ export default function TransfersPage() {
     const poNumber = searchParams.get('po')
     const isInstant = searchParams.get('instant') === 'true'
 
-    if (createTransfer === 'true' && transferType && poNumber && !isCreatingTransfer) {
+    if (createTransfer === 'true' && transferType && poNumber && !hasProcessedRef.current) {
+      // Mark as processed immediately
+      hasProcessedRef.current = true
+      
       // Clear URL parameters immediately to prevent double execution
       const newUrl = new URL(window.location.href)
       newUrl.searchParams.delete('create')
@@ -100,9 +109,11 @@ export default function TransfersPage() {
       
       if (isInstant) {
         // For instant transfers, create it immediately
-        setIsCreatingTransfer(true)
         createInstantTransfer(poNumber).finally(() => {
-          setIsCreatingTransfer(false)
+          // Reset the ref after a delay to allow for new transfers
+          setTimeout(() => {
+            hasProcessedRef.current = false
+          }, 1000)
         })
       } else {
         // Set transfer type
@@ -122,9 +133,14 @@ export default function TransfersPage() {
         
         // Load PO data to get items
         loadPurchaseOrderData(poNumber)
+        
+        // Reset the ref after a delay
+        setTimeout(() => {
+          hasProcessedRef.current = false
+        }, 1000)
       }
     }
-  }, [searchParams, isCreatingTransfer])
+  }, [searchParams])
 
   const loadTransfers = async () => {
     setLoading(true)
@@ -206,6 +222,15 @@ export default function TransfersPage() {
 
   const createInstantTransfer = async (poNumber) => {
     try {
+      // First check if a transfer already exists for this PO
+      const existingTransfers = await fetch('/api/transfers')
+      const existingData = await existingTransfers.json()
+      
+      if (existingData && existingData.some(t => t.purchase_order_number === poNumber)) {
+        toast.error(`A transfer already exists for Purchase Order ${poNumber}`)
+        return
+      }
+      
       // Load PO data
       const poData = await loadPurchaseOrderData(poNumber)
       
@@ -380,6 +405,29 @@ export default function TransfersPage() {
     return location?.icon || Building
   }
 
+  const handleDeleteTransfer = async (transferId) => {
+    if (!confirm('Are you sure you want to delete this transfer?')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/transfers?id=${transferId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to delete transfer')
+      }
+
+      toast.success('Transfer deleted successfully')
+      loadTransfers()
+    } catch (error) {
+      console.error('Error deleting transfer:', error)
+      toast.error('Failed to delete transfer')
+    }
+  }
+
   return (
     <div className="p-6">
       <div className="mb-8">
@@ -473,6 +521,7 @@ export default function TransfersPage() {
               <TableHead>Est. Arrival</TableHead>
               <TableHead>Tracking</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="w-8"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -588,6 +637,24 @@ export default function TransfersPage() {
                         <StatusIcon className="h-3 w-3 mr-1" />
                         {statusConfig[transfer.status]?.label}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteTransfer(transfer.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Transfer
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 )
