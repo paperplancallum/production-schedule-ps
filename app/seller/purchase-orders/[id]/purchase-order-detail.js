@@ -154,18 +154,21 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `PO-${order.po_number}.pdf`
+        a.download = `PO-${order.po_number}.html`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
+        
+        // Show helpful message
+        alert('Purchase order downloaded as HTML. You can open it in your browser and use Print > Save as PDF to create a PDF file.')
       } else {
         console.error('Error downloading PDF')
-        alert('Failed to download PDF')
+        alert('Failed to download purchase order')
       }
     } catch (error) {
       console.error('Error downloading PDF:', error)
-      alert('Failed to download PDF')
+      alert('Failed to download purchase order')
     } finally {
       setLoading(false)
     }
@@ -232,7 +235,7 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
             )}
             <Button variant="outline" onClick={handleDownloadPDF} disabled={loading}>
               <Download className="h-4 w-4 mr-2" />
-              Download PDF
+              Download
             </Button>
             <Button variant="outline" onClick={() => {}}>
               <Mail className="h-4 w-4 mr-2" />

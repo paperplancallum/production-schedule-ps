@@ -158,7 +158,7 @@ export async function GET(request, { params }) {
     // Return HTML with appropriate headers for download
     return new NextResponse(html, {
       headers: {
-        'Content-Type': 'text/html',
+        'Content-Type': 'text/html; charset=utf-8',
         'Content-Disposition': `attachment; filename="PO-${order.po_number}.html"`
       }
     })
