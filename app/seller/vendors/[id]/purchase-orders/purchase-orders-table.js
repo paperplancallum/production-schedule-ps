@@ -11,11 +11,10 @@ import CreatePurchaseOrderDialog from '@/app/seller/purchase-orders/create-purch
 
 const statusConfig = {
   draft: { label: 'Draft', color: 'secondary' },
-  submitted: { label: 'Submitted', color: 'blue' },
-  accepted: { label: 'Accepted', color: 'green' },
+  sent_to_supplier: { label: 'Sent To Supplier', color: 'blue' },
+  approved: { label: 'Approved', color: 'green' },
   in_progress: { label: 'In Progress', color: 'yellow' },
-  shipped: { label: 'Shipped', color: 'purple' },
-  delivered: { label: 'Delivered', color: 'green' },
+  complete: { label: 'Complete', color: 'green' },
   cancelled: { label: 'Cancelled', color: 'destructive' }
 }
 

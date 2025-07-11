@@ -19,12 +19,22 @@ export default async function PurchaseOrderPage({ params }) {
   // Fetch supplier details separately
   const { data: supplier } = await supabase
     .from('vendors')
-    .select('id, vendor_name, vendor_type, vendor_email, vendor_phone')
+    .select('id, vendor_name, vendor_type, email, contact_name, country, address')
     .eq('id', order.supplier_id)
     .single()
   
   // If supplier not found, use a default object
-  const supplierData = supplier || {
+  // Map the correct field names for the component
+  const supplierData = supplier ? {
+    id: supplier.id,
+    vendor_name: supplier.vendor_name,
+    vendor_type: supplier.vendor_type,
+    vendor_email: supplier.email,  // Map 'email' to 'vendor_email'
+    vendor_phone: '',  // No phone field in vendors table
+    contact_name: supplier.contact_name,
+    country: supplier.country,
+    address: supplier.address
+  } : {
     id: order.supplier_id,
     vendor_name: 'Unknown Supplier',
     vendor_type: 'unknown',

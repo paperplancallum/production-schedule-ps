@@ -12,11 +12,10 @@ import { createClient } from '@/lib/supabase/client'
 
 const statusConfig = {
   draft: { label: 'Draft', color: 'secondary' },
-  submitted: { label: 'Awaiting Approval', color: 'blue' },
-  accepted: { label: 'Accepted', color: 'green' },
+  sent_to_supplier: { label: 'Sent To Supplier', color: 'blue' },
+  approved: { label: 'Approved', color: 'green' },
   in_progress: { label: 'In Progress', color: 'yellow' },
-  shipped: { label: 'Shipped', color: 'purple' },
-  delivered: { label: 'Delivered', color: 'green' },
+  complete: { label: 'Complete', color: 'green' },
   cancelled: { label: 'Cancelled', color: 'destructive' }
 }
 
@@ -84,10 +83,9 @@ export default function PurchaseOrdersTable({ vendorId }) {
 
   const getAvailableStatusTransitions = (currentStatus) => {
     const transitions = {
-      'submitted': ['accepted', 'cancelled'],
-      'accepted': ['in_progress'],
-      'in_progress': ['shipped'],
-      'shipped': ['delivered']
+      'sent_to_supplier': ['approved', 'cancelled'],
+      'approved': ['in_progress'],
+      'in_progress': ['complete']
     }
     return transitions[currentStatus] || []
   }
@@ -174,9 +172,9 @@ export default function PurchaseOrdersTable({ vendorId }) {
                           <SelectContent>
                             {availableTransitions.map(status => (
                               <SelectItem key={status} value={status}>
-                                {status === 'accepted' && <CheckCircle className="h-4 w-4 mr-2 inline" />}
+                                {status === 'approved' && <CheckCircle className="h-4 w-4 mr-2 inline" />}
                                 {status === 'in_progress' && <Package className="h-4 w-4 mr-2 inline" />}
-                                {status === 'shipped' && <Truck className="h-4 w-4 mr-2 inline" />}
+                                {status === 'complete' && <CheckCircle className="h-4 w-4 mr-2 inline" />}
                                 {statusConfig[status]?.label}
                               </SelectItem>
                             ))}

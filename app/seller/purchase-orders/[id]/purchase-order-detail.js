@@ -27,11 +27,10 @@ import { createClient } from '@/lib/supabase/client'
 
 const statusConfig = {
   draft: { label: 'Draft', color: 'secondary', icon: FileText },
-  submitted: { label: 'Submitted', color: 'blue', icon: Clock },
-  accepted: { label: 'Accepted', color: 'green', icon: CheckCircle },
+  sent_to_supplier: { label: 'Sent To Supplier', color: 'blue', icon: Clock },
+  approved: { label: 'Approved', color: 'green', icon: CheckCircle },
   in_progress: { label: 'In Progress', color: 'yellow', icon: Package },
-  shipped: { label: 'Shipped', color: 'purple', icon: Truck },
-  delivered: { label: 'Delivered', color: 'green', icon: CheckCircle },
+  complete: { label: 'Complete', color: 'green', icon: CheckCircle },
   cancelled: { label: 'Cancelled', color: 'destructive', icon: XCircle }
 }
 
@@ -131,12 +130,11 @@ export default function PurchaseOrderDetail({ order: initialOrder }) {
 
   const getAvailableTransitions = () => {
     const transitions = {
-      'draft': ['submitted', 'cancelled'],
-      'submitted': ['cancelled'],
-      'accepted': ['cancelled'],
-      'in_progress': ['cancelled'],
-      'shipped': ['delivered', 'cancelled'],
-      'delivered': [],
+      'draft': ['cancelled'], // Removed 'sent_to_supplier' - will be done via email
+      'sent_to_supplier': ['approved', 'cancelled'], // Supplier confirms from their dashboard
+      'approved': ['in_progress', 'cancelled'],
+      'in_progress': ['complete', 'cancelled'],
+      'complete': [],
       'cancelled': []
     }
     return transitions[order.status] || []

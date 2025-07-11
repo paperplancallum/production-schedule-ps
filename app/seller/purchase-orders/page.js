@@ -14,11 +14,10 @@ import { useRouter } from 'next/navigation'
 
 const statusConfig = {
   draft: { label: 'Draft', color: 'secondary', icon: FileText },
-  submitted: { label: 'Submitted', color: 'blue', icon: Clock },
-  accepted: { label: 'Accepted', color: 'green', icon: CheckCircle },
+  sent_to_supplier: { label: 'Sent To Supplier', color: 'blue', icon: Clock },
+  approved: { label: 'Approved', color: 'green', icon: CheckCircle },
   in_progress: { label: 'In Progress', color: 'yellow', icon: Package },
-  shipped: { label: 'Shipped', color: 'purple', icon: Truck },
-  delivered: { label: 'Delivered', color: 'green', icon: CheckCircle },
+  complete: { label: 'Complete', color: 'green', icon: CheckCircle },
   cancelled: { label: 'Cancelled', color: 'destructive', icon: XCircle }
 }
 
@@ -68,8 +67,8 @@ export default function PurchaseOrdersPage() {
     const stats = {
       total: orderData.length,
       draft: orderData.filter(o => o.status === 'draft').length,
-      pending: orderData.filter(o => ['submitted', 'accepted', 'in_progress'].includes(o.status)).length,
-      completed: orderData.filter(o => o.status === 'delivered').length
+      pending: orderData.filter(o => ['sent_to_supplier', 'approved', 'in_progress'].includes(o.status)).length,
+      completed: orderData.filter(o => o.status === 'complete').length
     }
     setStats(stats)
   }

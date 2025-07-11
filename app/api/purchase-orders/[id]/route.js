@@ -103,12 +103,11 @@ export async function PATCH(request, { params }) {
     // Validate status transitions
     if (body.status) {
       const validTransitions = {
-        'draft': ['submitted', 'cancelled'],
-        'submitted': ['accepted', 'cancelled'],
-        'accepted': ['in_progress', 'cancelled'],
-        'in_progress': ['shipped', 'cancelled'],
-        'shipped': ['delivered', 'cancelled'],
-        'delivered': [],
+        'draft': ['sent_to_supplier', 'cancelled'],
+        'sent_to_supplier': ['approved', 'cancelled'],
+        'approved': ['in_progress', 'cancelled'],
+        'in_progress': ['complete', 'cancelled'],
+        'complete': [],
         'cancelled': []
       }
 
