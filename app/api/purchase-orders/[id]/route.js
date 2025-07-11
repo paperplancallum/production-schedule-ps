@@ -276,7 +276,125 @@ export async function PATCH(request, { params }) {
       }
     }
 
-    // Fetch the complete order with status history after updates
+    // Check if this is a vendor making the update and return appropriate format
+    if (isVendor) {
+      // For vendor updates, return data in the format the vendor page expects
+      // Fetch order
+      const { data: orderData, error: orderError } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .eq('id', id)
+        .single()
+      
+      if (orderError) {
+        console.error('Error fetching order for vendor:', orderError)
+        return NextResponse.json(data)
+      }
+      
+      // Fetch vendor info
+      const { data: vendorData } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('id', orderData.supplier_id)
+        .single()
+      
+      // Fetch seller info
+      const { data: sellerData } = await supabase
+        .from('sellers')
+        .select('*')
+        .eq('id', orderData.seller_id)
+        .single()
+      
+      // Fetch items with products
+      const { data: items } = await supabase
+        .from('purchase_order_items')
+        .select('*')
+        .eq('purchase_order_id', id)
+      
+      let itemsWithDetails = items || []
+      
+      // Fetch product details for items
+      if (items && items.length > 0) {
+        const productSupplierIds = [...new Set(items.map(item => item.product_supplier_id).filter(Boolean))]
+        
+        if (productSupplierIds.length > 0) {
+          const { data: productSuppliers } = await supabase
+            .from('product_suppliers')
+            .select(`
+              id,
+              lead_time_days,
+              products:product_id(
+                id,
+                product_name,
+                sku,
+                description,
+                unit_of_measure
+              )
+            `)
+            .in('id', productSupplierIds)
+          
+          if (productSuppliers) {
+            const suppliersMap = productSuppliers.reduce((acc, ps) => {
+              acc[ps.id] = ps
+              return acc
+            }, {})
+            
+            itemsWithDetails = items.map(item => ({
+              ...item,
+              product: suppliersMap[item.product_supplier_id]?.products || null,
+              lead_time_days: suppliersMap[item.product_supplier_id]?.lead_time_days || 0
+            }))
+          }
+        }
+      }
+      
+      // Fetch status history
+      const { data: statusHistory } = await supabase
+        .from('purchase_order_status_history')
+        .select('id, from_status, to_status, notes, created_at, changed_by')
+        .eq('purchase_order_id', id)
+        .order('created_at', { ascending: false })
+      
+      // Add user info to status history
+      const statusHistoryWithUsers = await Promise.all(
+        (statusHistory || []).map(async (history) => {
+          if (!history.changed_by) return history
+          
+          const { data: seller } = await supabase
+            .from('sellers')
+            .select('id, company_name, full_name')
+            .eq('id', history.changed_by)
+            .single()
+          
+          if (seller) {
+            return { ...history, changed_by_user: { type: 'seller', name: seller.company_name || seller.full_name || 'Seller' } }
+          }
+          
+          const { data: vendor } = await supabase
+            .from('vendors')
+            .select('id, vendor_name')
+            .eq('user_id', history.changed_by)
+            .single()
+          
+          if (vendor) {
+            return { ...history, changed_by_user: { type: 'vendor', name: vendor.vendor_name } }
+          }
+          
+          return history
+        })
+      )
+      
+      // Return in vendor format
+      return NextResponse.json({
+        ...orderData,
+        vendor: vendorData,
+        seller: sellerData || {},
+        items: itemsWithDetails,
+        status_history: statusHistoryWithUsers || []
+      })
+    }
+    
+    // For seller updates, use the existing logic
     const { data: completeOrder, error: fetchCompleteError } = await supabase
       .from('purchase_orders')
       .select(`
