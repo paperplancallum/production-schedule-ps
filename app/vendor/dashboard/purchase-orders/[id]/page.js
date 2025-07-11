@@ -54,39 +54,26 @@ export default async function VendorPurchaseOrderPage({ params }) {
       notes,
       product_id,
       product_supplier_id,
-      price_tier_id
+      price_tier_id,
+      product:products(
+        id,
+        product_name,
+        sku,
+        description,
+        unit_of_measure
+      ),
+      product_supplier:product_suppliers(
+        id,
+        lead_time_days,
+        moq
+      ),
+      price_tier:supplier_price_tiers(
+        id,
+        minimum_order_quantity,
+        unit_price
+      )
     `)
     .eq('purchase_order_id', order.id)
-
-  // Fetch product details for each item
-  const itemsWithDetails = await Promise.all(
-    (items || []).map(async (item) => {
-      const { data: product } = await supabase
-        .from('products')
-        .select('id, product_name, sku, description, unit_of_measure')
-        .eq('id', item.product_id)
-        .single()
-
-      const { data: productSupplier } = await supabase
-        .from('product_suppliers')
-        .select('id, lead_time_days, moq')
-        .eq('id', item.product_supplier_id)
-        .single()
-
-      const { data: priceTier } = item.price_tier_id ? await supabase
-        .from('supplier_price_tiers')
-        .select('id, minimum_order_quantity, unit_price')
-        .eq('id', item.price_tier_id)
-        .single() : { data: null }
-
-      return {
-        ...item,
-        product,
-        product_supplier: productSupplier,
-        price_tier: priceTier
-      }
-    })
-  )
 
   // Fetch status history
   const { data: statusHistory } = await supabase
@@ -100,7 +87,7 @@ export default async function VendorPurchaseOrderPage({ params }) {
     ...order,
     vendor,
     seller: seller || {},
-    items: itemsWithDetails,
+    items: items || [],
     status_history: statusHistory || []
   }
 
