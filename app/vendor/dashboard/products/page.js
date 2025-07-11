@@ -23,117 +23,72 @@ export default async function VendorProductsPage() {
     redirect('/vendor/dashboard')
   }
 
-  // Since vendors can't read product_suppliers due to RLS, we need a different approach
-  // For now, we'll show a message that products need to be properly assigned
+  // Since the join query is failing, let's fetch data separately
   let products = []
   let rlsError = null
   
-  // Try the query anyway to confirm the RLS issue
-  const { data, error } = await supabase
-    .from('products')
+  // First, get all product_suppliers for this vendor
+  const { data: productSuppliers, error: psError } = await supabase
+    .from('product_suppliers')
     .select(`
       *,
-      product_suppliers!inner (
+      supplier_price_tiers (
         id,
-        vendor_id,
-        is_primary,
-        lead_time_days,
-        moq,
-        supplier_price_tiers (
-          id,
-          minimum_order_quantity,
-          unit_price,
-          is_default
-        )
+        minimum_order_quantity,
+        unit_price,
+        is_default
       )
     `)
-    .eq('product_suppliers.vendor_id', vendor.id)
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error('Error fetching vendor products:', {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-      fullError: JSON.stringify(error, null, 2)
-    })
-    rlsError = error
-  } else {
-    products = data || []
-  }
-
-  // Additional debug: Check if there are any product_suppliers entries for this vendor
-  const { data: supplierEntries, error: supplierError } = await supabase
-    .from('product_suppliers')
-    .select('*')
     .eq('vendor_id', vendor.id)
-    .limit(5)
   
-  console.log('Product supplier entries for vendor:', supplierEntries)
-  console.log('Product supplier query error:', supplierError)
+  console.log('Product suppliers with tiers:', productSuppliers?.length || 0)
   
-  // If we can read product_suppliers now, let's check the products table permissions
-  if (supplierEntries && supplierEntries.length > 0) {
-    console.log('✅ Can read product_suppliers! Found:', supplierEntries.length)
+  if (productSuppliers && productSuppliers.length > 0) {
+    // Get unique product IDs
+    const productIds = [...new Set(productSuppliers.map(ps => ps.product_id))]
     
-    // Try to read products directly
-    const productIds = supplierEntries.map(ps => ps.product_id)
-    const { data: directProducts, error: directError } = await supabase
-      .from('products')
-      .select('*')
-      .in('id', productIds)
-    
-    console.log('Direct products query:', { 
-      data: directProducts, 
-      error: directError,
-      productIds: productIds,
-      errorDetails: directError ? JSON.stringify(directError, null, 2) : null
+    // Try to fetch products one by one to see which ones fail
+    const productPromises = productIds.map(async (productId) => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single()
+      
+      if (error) {
+        console.log(`Failed to fetch product ${productId}:`, error.message)
+        return null
+      }
+      return data
     })
     
-    // If direct query works, manually combine the data
-    if (directProducts && directProducts.length > 0) {
-      console.log('✅ Direct product query works! Manually combining data...')
-      products = directProducts.map(product => {
-        const supplierInfo = supplierEntries.find(ps => ps.product_id === product.id)
-        return {
-          ...product,
-          product_suppliers: [supplierInfo]
-        }
-      })
-    }
-  }
-  
-  // Also check without any filters to see if we can access the table at all
-  const { data: allSuppliers, error: allError } = await supabase
-    .from('product_suppliers')
-    .select('vendor_id')
-    .limit(10)
-  
-  console.log('All product suppliers (first 10):', allSuppliers)
-  console.log('All suppliers query error:', allError)
-
-  if (error) {
-    console.error('Error fetching products:', error)
+    const fetchedProducts = await Promise.all(productPromises)
+    const validProducts = fetchedProducts.filter(p => p !== null)
+    
+    console.log(`Successfully fetched ${validProducts.length} out of ${productIds.length} products`)
+    
+    // Combine products with their supplier info
+    products = validProducts.map(product => {
+      const supplierData = productSuppliers.filter(ps => ps.product_id === product.id)
+      return {
+        ...product,
+        product_suppliers: supplierData
+      }
+    })
   }
 
-  // Debug logging
-  console.log('=== VENDOR PRODUCTS DEBUG ===')
-  console.log('Current user ID:', user.id)
-  console.log('Vendor record:', vendor)
-  console.log('Vendor ID:', vendor?.id)
-  console.log('Vendor user_id:', vendor?.user_id)
-  console.log('Auth matches vendor?', vendor?.user_id === user.id)
-  console.log('Products found via join query:', products?.length || 0)
-  console.log('Main query error:', error?.message)
-  
-  // Final check - try the simplest possible query
-  const { data: testAccess, error: testError } = await supabase
-    .from('product_suppliers')
-    .select('id, vendor_id')
-    .limit(1)
-  
-  console.log('Can read ANY product_suppliers?', { success: !testError, data: testAccess })
+  if (psError) {
+    console.error('Error fetching product suppliers:', psError)
+  }
+
+  // Summary
+  console.log('=== VENDOR PRODUCTS SUMMARY ===')
+  console.log('Vendor:', vendor.vendor_name, vendor.id)
+  console.log('Products found:', products.length)
+  if (products.length === 0 && productSuppliers && productSuppliers.length > 0) {
+    console.log('⚠️ Found product_suppliers but cannot read products table')
+    console.log('This indicates an RLS policy issue on the products table')
+  }
 
   return (
     <div className="flex-1 bg-slate-50 dark:bg-slate-900">
