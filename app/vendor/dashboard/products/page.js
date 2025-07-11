@@ -67,6 +67,20 @@ export default async function VendorProductsPage() {
   console.log('Product supplier entries for vendor:', supplierEntries)
   console.log('Product supplier query error:', supplierError)
   
+  // If we can read product_suppliers now, let's check the products table permissions
+  if (supplierEntries && supplierEntries.length > 0) {
+    console.log('✅ Can read product_suppliers! Found:', supplierEntries.length)
+    
+    // Try to read products directly
+    const productIds = supplierEntries.map(ps => ps.product_id)
+    const { data: directProducts, error: directError } = await supabase
+      .from('products')
+      .select('*')
+      .in('id', productIds)
+    
+    console.log('Direct products query:', { data: directProducts, error: directError })
+  }
+  
   // Also check without any filters to see if we can access the table at all
   const { data: allSuppliers, error: allError } = await supabase
     .from('product_suppliers')
@@ -81,15 +95,22 @@ export default async function VendorProductsPage() {
   }
 
   // Debug logging
+  console.log('=== VENDOR PRODUCTS DEBUG ===')
   console.log('Current user ID:', user.id)
   console.log('Vendor record:', vendor)
   console.log('Vendor ID:', vendor?.id)
-  console.log('Seller ID:', vendor?.seller_id)
-  console.log('Products query error:', error)
-  console.log('Products found:', products?.length || 0)
-  if (products && products.length > 0) {
-    console.log('Sample product:', products[0])
-  }
+  console.log('Vendor user_id:', vendor?.user_id)
+  console.log('Auth matches vendor?', vendor?.user_id === user.id)
+  console.log('Products found via join query:', products?.length || 0)
+  console.log('Main query error:', error?.message)
+  
+  // Final check - try the simplest possible query
+  const { data: testAccess, error: testError } = await supabase
+    .from('product_suppliers')
+    .select('id, vendor_id')
+    .limit(1)
+  
+  console.log('Can read ANY product_suppliers?', { success: !testError, data: testAccess })
 
   return (
     <div className="flex-1 bg-slate-50 dark:bg-slate-900">
