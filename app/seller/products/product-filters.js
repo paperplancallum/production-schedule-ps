@@ -100,6 +100,9 @@ export default function ProductFilters({ onFiltersChange, suppliers = [] }) {
   const removeCondition = (conditionId) => {
     if (conditions.length > 1) {
       setConditions(conditions.filter(c => c.id !== conditionId))
+    } else {
+      // Reset the only condition instead of removing it
+      setConditions([{ id: 'cond-1', field: '', operator: '', value: '' }])
     }
   }
 
@@ -249,10 +252,10 @@ export default function ProductFilters({ onFiltersChange, suppliers = [] }) {
                                 <ChevronDown className="h-4 w-4 ml-2 shrink-0 opacity-50" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-56 max-h-64 overflow-y-auto">
+                            <DropdownMenuContent className="w-56 max-h-64 overflow-y-auto bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
                               {selectedField?.type === 'select' && selectedField.options ? (
                                 <>
-                                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                                  <DropdownMenuLabel className="text-xs text-slate-500 dark:text-slate-400">
                                     Select multiple options
                                   </DropdownMenuLabel>
                                   <DropdownMenuSeparator />
@@ -271,6 +274,7 @@ export default function ProductFilters({ onFiltersChange, suppliers = [] }) {
                                             : currentValues.filter(v => v !== opt.value)
                                           updateCondition(condition.id, { value: newValues })
                                         }}
+                                        className="text-slate-700 dark:text-slate-300"
                                       >
                                         {opt.label}
                                       </DropdownMenuCheckboxItem>
@@ -336,8 +340,8 @@ export default function ProductFilters({ onFiltersChange, suppliers = [] }) {
                       e.stopPropagation()
                       removeCondition(condition.id)
                     }}
-                    disabled={conditions.length === 1}
-                    title={conditions.length === 1 ? "Cannot remove the last filter" : "Remove filter"}
+                    disabled={false}
+                    title={conditions.length === 1 ? "Clear filter" : "Remove filter"}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
