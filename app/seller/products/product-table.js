@@ -39,7 +39,7 @@ const columns = [
   {
     accessorKey: 'sku',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="SKU" />
+      <DataTableColumnHeader column={column} title="Internal SKU" />
     ),
     cell: ({ row }) => (
       <div className="text-slate-600">{row.getValue('sku') || '-'}</div>
@@ -321,7 +321,7 @@ export function ProductTable() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sku">SKU *</Label>
+                    <Label htmlFor="sku">Internal SKU *</Label>
                     <Input
                       id="sku"
                       value={formData.sku}
@@ -389,7 +389,7 @@ export function ProductTable() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit_sku">SKU *</Label>
+                <Label htmlFor="edit_sku">Internal SKU *</Label>
                 <Input
                   id="edit_sku"
                   value={formData.sku}
