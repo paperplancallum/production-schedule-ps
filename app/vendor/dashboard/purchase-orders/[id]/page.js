@@ -43,7 +43,7 @@ export default async function VendorPurchaseOrderPage({ params }) {
     .eq('id', order.seller_id)
     .single()
 
-  // Fetch order items with related data
+  // Fetch order items first
   const { data: items } = await supabase
     .from('purchase_order_items')
     .select(`
@@ -54,26 +54,27 @@ export default async function VendorPurchaseOrderPage({ params }) {
       notes,
       product_id,
       product_supplier_id,
-      price_tier_id,
-      product:products(
-        id,
-        product_name,
-        sku,
-        description,
-        unit_of_measure
-      ),
-      product_supplier:product_suppliers(
-        id,
-        lead_time_days,
-        moq
-      ),
-      price_tier:supplier_price_tiers(
-        id,
-        minimum_order_quantity,
-        unit_price
-      )
+      price_tier_id
     `)
     .eq('purchase_order_id', order.id)
+
+  // Fetch product details manually since vendors might not have direct access to products table
+  const itemsWithDetails = await Promise.all(
+    (items || []).map(async (item) => {
+      // Try to get product through the seller's products
+      const { data: product } = await supabase
+        .from('products')
+        .select('id, product_name, sku, description, unit_of_measure')
+        .eq('id', item.product_id)
+        .eq('seller_id', order.seller_id)
+        .single()
+
+      return {
+        ...item,
+        product: product || null
+      }
+    })
+  )
 
   // Fetch status history
   const { data: statusHistory } = await supabase
@@ -87,7 +88,7 @@ export default async function VendorPurchaseOrderPage({ params }) {
     ...order,
     vendor,
     seller: seller || {},
-    items: items || [],
+    items: itemsWithDetails || [],
     status_history: statusHistory || []
   }
 
