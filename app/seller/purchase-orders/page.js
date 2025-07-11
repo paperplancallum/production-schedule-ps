@@ -7,10 +7,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, Search, FileText, Package, Truck, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { Plus, Search, FileText, Package, Truck, CheckCircle, XCircle, Clock, ClipboardCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import CreatePurchaseOrderDialog from './create-purchase-order-dialog'
+import ScheduleInspectionDialog from './schedule-inspection-dialog'
 import { useRouter } from 'next/navigation'
+import { Checkbox } from '@/components/ui/checkbox'
+import { toast } from 'sonner'
 
 const statusConfig = {
   draft: { label: 'Draft', color: 'secondary', icon: FileText },
@@ -28,6 +31,9 @@ export default function PurchaseOrdersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [selectedOrders, setSelectedOrders] = useState([])
+  const [inspectionDialogOpen, setInspectionDialogOpen] = useState(false)
+  const [inspectionData, setInspectionData] = useState(null)
   const [stats, setStats] = useState({
     total: 0,
     draft: 0,
@@ -51,8 +57,13 @@ export default function PurchaseOrdersPage() {
       const data = await response.json()
 
       if (response.ok) {
-        setOrders(data)
-        calculateStats(data)
+        // Ensure we have goods_ready_date for each order
+        const ordersWithDates = data.map(order => ({
+          ...order,
+          goods_ready_date: order.goods_ready_date || order.requested_delivery_date
+        }))
+        setOrders(ordersWithDates)
+        calculateStats(ordersWithDates)
       } else {
         console.error('Error loading purchase orders:', data.error)
       }
@@ -97,6 +108,61 @@ export default function PurchaseOrdersPage() {
     router.push(`/seller/purchase-orders/${orderId}`)
   }
 
+  const handleSelectOrder = (orderId, checked) => {
+    if (checked) {
+      setSelectedOrders([...selectedOrders, orderId])
+    } else {
+      setSelectedOrders(selectedOrders.filter(id => id !== orderId))
+    }
+  }
+
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedOrders(filteredOrders.map(order => order.id))
+    } else {
+      setSelectedOrders([])
+    }
+  }
+
+  const prepareInspectionData = () => {
+    const selectedOrderData = orders.filter(order => selectedOrders.includes(order.id))
+    
+    // Group by supplier
+    const supplierGroups = selectedOrderData.reduce((groups, order) => {
+      const supplierId = order.supplier_id
+      if (!groups[supplierId]) {
+        groups[supplierId] = {
+          supplier: order.supplier,
+          orders: [],
+          latestGoodsReadyDate: null
+        }
+      }
+      groups[supplierId].orders.push(order)
+      
+      // Update latest goods ready date
+      const orderDate = order.goods_ready_date || order.requested_delivery_date
+      if (orderDate && (!groups[supplierId].latestGoodsReadyDate || 
+          new Date(orderDate) > new Date(groups[supplierId].latestGoodsReadyDate))) {
+        groups[supplierId].latestGoodsReadyDate = orderDate
+      }
+      
+      return groups
+    }, {})
+    
+    return Object.values(supplierGroups)
+  }
+
+  const handleScheduleInspection = () => {
+    if (selectedOrders.length === 0) {
+      toast.error('Please select at least one purchase order')
+      return
+    }
+    
+    const inspectionGroups = prepareInspectionData()
+    setInspectionData(inspectionGroups)
+    setInspectionDialogOpen(true)
+  }
+
   return (
     <div className="p-6">
       <div className="mb-8">
@@ -109,10 +175,21 @@ export default function PurchaseOrdersPage() {
               Manage your purchase orders
             </p>
           </div>
-          <Button onClick={() => setCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Purchase Order
-          </Button>
+          <div className="flex gap-2">
+            {selectedOrders.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleScheduleInspection}
+              >
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Schedule Inspection ({selectedOrders.length})
+              </Button>
+            )}
+            <Button onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Purchase Order
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -175,10 +252,17 @@ export default function PurchaseOrdersPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                  onCheckedChange={handleSelectAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
               <TableHead>PO Number</TableHead>
               <TableHead>Supplier</TableHead>
               <TableHead>Order Date</TableHead>
-              <TableHead>Delivery Date</TableHead>
+              <TableHead>Goods Ready</TableHead>
               <TableHead>Items</TableHead>
               <TableHead>Total</TableHead>
               <TableHead>Status</TableHead>
@@ -187,13 +271,13 @@ export default function PurchaseOrdersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   Loading purchase orders...
                 </TableCell>
               </TableRow>
             ) : filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   <div className="flex flex-col items-center">
                     <FileText className="h-12 w-12 text-gray-400 mb-2" />
                     <p className="text-gray-500">No purchase orders found</p>
@@ -214,16 +298,55 @@ export default function PurchaseOrdersPage() {
                 return (
                   <TableRow
                     key={order.id}
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800"
-                    onClick={() => handleRowClick(order.id)}
+                    className="hover:bg-gray-50 dark:hover:bg-slate-800"
                   >
-                    <TableCell className="font-medium">{order.po_number}</TableCell>
-                    <TableCell>{order.supplier?.vendor_name || 'Unknown'}</TableCell>
-                    <TableCell>{formatDate(order.order_date)}</TableCell>
-                    <TableCell>{formatDate(order.requested_delivery_date)}</TableCell>
-                    <TableCell>{order.items?.length || 0}</TableCell>
-                    <TableCell>{formatCurrency(order.total_amount)}</TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedOrders.includes(order.id)}
+                        onCheckedChange={(checked) => handleSelectOrder(order.id, checked)}
+                        aria-label={`Select ${order.po_number}`}
+                      />
+                    </TableCell>
+                    <TableCell 
+                      className="font-medium cursor-pointer"
+                      onClick={() => handleRowClick(order.id)}
+                    >
+                      {order.po_number}
+                    </TableCell>
+                    <TableCell 
+                      className="cursor-pointer"
+                      onClick={() => handleRowClick(order.id)}
+                    >
+                      {order.supplier?.vendor_name || 'Unknown'}
+                    </TableCell>
+                    <TableCell 
+                      className="cursor-pointer"
+                      onClick={() => handleRowClick(order.id)}
+                    >
+                      {formatDate(order.order_date)}
+                    </TableCell>
+                    <TableCell 
+                      className="cursor-pointer"
+                      onClick={() => handleRowClick(order.id)}
+                    >
+                      {formatDate(order.goods_ready_date)}
+                    </TableCell>
+                    <TableCell 
+                      className="cursor-pointer"
+                      onClick={() => handleRowClick(order.id)}
+                    >
+                      {order.items?.length || 0}
+                    </TableCell>
+                    <TableCell 
+                      className="cursor-pointer"
+                      onClick={() => handleRowClick(order.id)}
+                    >
+                      {formatCurrency(order.total_amount)}
+                    </TableCell>
+                    <TableCell 
+                      className="cursor-pointer"
+                      onClick={() => handleRowClick(order.id)}
+                    >
                       <Badge variant={statusConfig[order.status]?.color}>
                         <StatusIcon className="h-3 w-3 mr-1" />
                         {statusConfig[order.status]?.label}
@@ -241,6 +364,17 @@ export default function PurchaseOrdersPage() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         onSuccess={() => loadPurchaseOrders()}
+      />
+      
+      <ScheduleInspectionDialog
+        open={inspectionDialogOpen}
+        onOpenChange={setInspectionDialogOpen}
+        inspectionGroups={inspectionData}
+        onSuccess={() => {
+          setSelectedOrders([])
+          loadPurchaseOrders()
+          toast.success('Inspection(s) scheduled successfully')
+        }}
       />
     </div>
   )
