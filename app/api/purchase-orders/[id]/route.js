@@ -41,13 +41,7 @@ export async function GET(request, { params }) {
           email,
           address,
           contact_name,
-          address_line1,
-          address_line2,
-          city,
-          state,
-          zip_code,
-          country,
-          tax_id
+          country
         ),
         items:purchase_order_items(
           id,
@@ -398,13 +392,7 @@ export async function PATCH(request, { params }) {
           email,
           address,
           contact_name,
-          address_line1,
-          address_line2,
-          city,
-          state,
-          zip_code,
-          country,
-          tax_id
+          country
         ),
         items:purchase_order_items(
           id,
@@ -589,13 +577,7 @@ export async function PUT(request, { params }) {
           email,
           address,
           contact_name,
-          address_line1,
-          address_line2,
-          city,
-          state,
-          zip_code,
-          country,
-          tax_id
+          country
         ),
         items:purchase_order_items(
           id,
