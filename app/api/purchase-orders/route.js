@@ -19,11 +19,6 @@ export async function GET(request) {
       .from('purchase_orders')
       .select(`
         *,
-        supplier:vendors!purchase_orders_supplier_id_fkey(
-          id,
-          vendor_name,
-          vendor_type
-        ),
         items:purchase_order_items(
           id,
           quantity,
@@ -55,7 +50,23 @@ export async function GET(request) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json(data)
+    // Fetch vendor information separately for each order
+    const ordersWithSuppliers = await Promise.all(
+      data.map(async (order) => {
+        const { data: supplier } = await supabase
+          .from('vendors')
+          .select('id, vendor_name, vendor_type')
+          .eq('id', order.supplier_id)
+          .single()
+        
+        return {
+          ...order,
+          supplier
+        }
+      })
+    )
+
+    return NextResponse.json(ordersWithSuppliers)
   } catch (error) {
     console.error('Error in GET /api/purchase-orders:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -138,11 +149,6 @@ export async function POST(request) {
       .from('purchase_orders')
       .select(`
         *,
-        supplier:vendors!purchase_orders_supplier_id_fkey(
-          id,
-          vendor_name,
-          vendor_type
-        ),
         items:purchase_order_items(
           id,
           quantity,
@@ -163,7 +169,19 @@ export async function POST(request) {
       return NextResponse.json({ error: fetchError.message }, { status: 400 })
     }
 
-    return NextResponse.json(completeOrder, { status: 201 })
+    // Fetch supplier information separately
+    const { data: supplier } = await supabase
+      .from('vendors')
+      .select('id, vendor_name, vendor_type')
+      .eq('id', completeOrder.supplier_id)
+      .single()
+
+    const orderWithSupplier = {
+      ...completeOrder,
+      supplier
+    }
+
+    return NextResponse.json(orderWithSupplier, { status: 201 })
   } catch (error) {
     console.error('Error in POST /api/purchase-orders:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
