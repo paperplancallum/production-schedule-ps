@@ -109,9 +109,13 @@ export default function ScheduleInspectionDialog({ open, onOpenChange, inspectio
         return Promise.all(orderPromises)
       })
 
-      await Promise.all(inspectionPromises)
+      const results = await Promise.all(inspectionPromises)
       
-      onSuccess()
+      // Flatten the results to get all created inspections
+      const createdInspections = results.flat()
+      const inspectionIds = createdInspections.map(result => result.data?.id).filter(Boolean)
+      
+      onSuccess(inspectionIds)
       onOpenChange(false)
     } catch (error) {
       console.error('Error scheduling inspections:', error)

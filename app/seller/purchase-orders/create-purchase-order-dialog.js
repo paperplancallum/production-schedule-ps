@@ -77,7 +77,7 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
             product_supplier_id: productSupplier.id,
             product_id: product.id,
             product: productSupplier.product || product, // Include the full product object
-            quantity: productSupplier.moq || 1,
+            quantity: Math.max(productSupplier.moq || 1, 1), // Start with MOQ but allow editing
             unit_price: defaultTier?.unit_price || 0,
             price_tier_id: defaultTier?.id || null,
             moq: productSupplier.moq,
@@ -259,6 +259,16 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
     if (items.length === 0) {
       setError('Please add at least one item to the order')
       return
+    }
+
+    // Validate MOQ for all items
+    for (const item of items) {
+      const productSupplier = supplierProducts.find(ps => ps.id === item.product_supplier_id)
+      const moq = productSupplier?.moq || 0
+      if (moq > 0 && item.quantity < moq) {
+        setError(`${item.product?.product_name} quantity must be at least ${moq} units (MOQ)`)
+        return
+      }
     }
 
     setLoading(true)
@@ -497,7 +507,12 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
                       <TableHead className="text-right">Quantity</TableHead>
                       <TableHead className="text-right">Unit Price</TableHead>
                       <TableHead className="text-right">Total</TableHead>
-                      <TableHead>Price Tier</TableHead>
+                      <TableHead>
+                        <div className="flex items-center gap-1">
+                          <span>Price Tiers</span>
+                          <span className="text-xs font-normal text-slate-500">(qty for savings)</span>
+                        </div>
+                      </TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -506,7 +521,51 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
                       <TableRow key={index}>
                         <TableCell>{item.product?.product_name}</TableCell>
                         <TableCell>{item.product?.sku}</TableCell>
-                        <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="space-y-1">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={item.quantity}
+                              onChange={(e) => {
+                                const newQuantity = parseInt(e.target.value) || 1
+                                const updatedItems = [...items]
+                                updatedItems[index] = {
+                                  ...item,
+                                  quantity: newQuantity
+                                }
+                                
+                                // Update price tier based on new quantity
+                                const productSupplier = supplierProducts.find(ps => ps.id === item.product_supplier_id)
+                                if (productSupplier?.price_tiers?.length > 0) {
+                                  const applicableTier = productSupplier.price_tiers
+                                    .filter(tier => newQuantity >= tier.minimum_order_quantity)
+                                    .sort((a, b) => b.minimum_order_quantity - a.minimum_order_quantity)[0]
+                                  
+                                  if (applicableTier) {
+                                    updatedItems[index].unit_price = applicableTier.unit_price
+                                    updatedItems[index].price_tier_id = applicableTier.id
+                                  }
+                                }
+                                
+                                setItems(updatedItems)
+                              }}
+                              className="w-24 text-right"
+                            />
+                            {(() => {
+                              const productSupplier = supplierProducts.find(ps => ps.id === item.product_supplier_id)
+                              const moq = productSupplier?.moq || 0
+                              if (moq > 0 && item.quantity < moq) {
+                                return (
+                                  <span className="text-xs text-red-500">
+                                    Min: {moq}
+                                  </span>
+                                )
+                              }
+                              return null
+                            })()}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">${item.unit_price.toFixed(2)}</TableCell>
                         <TableCell className="text-right">${(item.quantity * item.unit_price).toFixed(2)}</TableCell>
                         <TableCell>
@@ -514,16 +573,61 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
                             const productSupplier = supplierProducts.find(ps => ps.id === item.product_supplier_id)
                             const tiers = productSupplier?.price_tiers || []
                             if (tiers.length > 0) {
-                              const applicableTier = tiers
-                                .sort((a, b) => b.minimum_order_quantity - a.minimum_order_quantity)
-                                .find(tier => item.quantity >= tier.minimum_order_quantity)
-                              if (applicableTier) {
-                                return (
-                                  <span className="text-xs text-slate-600">
-                                    {applicableTier.minimum_order_quantity}+ units
-                                  </span>
-                                )
-                              }
+                              const sortedTiers = tiers.sort((a, b) => a.minimum_order_quantity - b.minimum_order_quantity)
+                              const applicableTier = sortedTiers
+                                .filter(tier => item.quantity >= tier.minimum_order_quantity)
+                                .sort((a, b) => b.minimum_order_quantity - a.minimum_order_quantity)[0]
+                              
+                              return (
+                                <div className="space-y-1">
+                                  <div className="text-xs space-y-1">
+                                    {sortedTiers.map((tier, idx) => {
+                                      const isActive = tier.id === applicableTier?.id
+                                      const couldApply = item.quantity >= tier.minimum_order_quantity
+                                      
+                                      return (
+                                        <div 
+                                          key={idx} 
+                                          className={`flex items-center gap-1 ${
+                                            isActive 
+                                              ? 'font-medium text-blue-600' 
+                                              : couldApply 
+                                                ? 'text-slate-600' 
+                                                : 'text-slate-400'
+                                          }`}
+                                        >
+                                          {isActive && <span className="text-xs">→</span>}
+                                          <span className={!isActive ? 'ml-3' : ''}>
+                                            {tier.minimum_order_quantity.toLocaleString()}+ @ ${tier.unit_price}
+                                          </span>
+                                          {!isActive && !couldApply && tier.minimum_order_quantity > item.quantity && (
+                                            <span className="text-xs text-slate-400">
+                                              (+{(tier.minimum_order_quantity - item.quantity).toLocaleString()})
+                                            </span>
+                                          )}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                  {(() => {
+                                    // Show potential savings
+                                    const nextTier = sortedTiers.find(tier => tier.minimum_order_quantity > item.quantity)
+                                    if (nextTier && applicableTier) {
+                                      const currentTotal = item.quantity * applicableTier.unit_price
+                                      const nextTotal = nextTier.minimum_order_quantity * nextTier.unit_price
+                                      const unitSavings = applicableTier.unit_price - nextTier.unit_price
+                                      if (unitSavings > 0) {
+                                        return (
+                                          <div className="text-xs text-green-600 font-medium mt-1 pt-1 border-t">
+                                            Save ${unitSavings.toFixed(2)}/unit at {nextTier.minimum_order_quantity.toLocaleString()}+
+                                          </div>
+                                        )
+                                      }
+                                    }
+                                    return null
+                                  })()}
+                                </div>
+                              )
                             }
                             return <span className="text-xs text-slate-400">-</span>
                           })()}

@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Plus, MoreHorizontal, RefreshCw, Eye, Calendar, CheckCircle, XCircle, Clock, AlertCircle, ChevronRight, ChevronDown, Building, Package, Trash2, Download } from 'lucide-react'
 import { toast } from 'sonner'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Dialog,
   DialogContent,
@@ -41,16 +41,42 @@ const inspectionTypes = [
 
 export default function InspectionsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [inspections, setInspections] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedRows, setExpandedRows] = useState([])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [inspectionToDelete, setInspectionToDelete] = useState(null)
+  const [highlightedInspections, setHighlightedInspections] = useState([])
   const supabase = createClient()
 
   useEffect(() => {
     fetchInspections()
   }, [])
+
+  useEffect(() => {
+    // Check for highlight parameter
+    const highlight = searchParams.get('highlight')
+    if (highlight) {
+      const ids = highlight.split(',')
+      setHighlightedInspections(ids)
+      
+      // Auto-expand highlighted inspections
+      setExpandedRows(ids)
+      
+      // Remove highlight from URL after a delay
+      setTimeout(() => {
+        const newUrl = new URL(window.location.href)
+        newUrl.searchParams.delete('highlight')
+        window.history.replaceState({}, '', newUrl)
+        
+        // Remove highlight effect after animation
+        setTimeout(() => {
+          setHighlightedInspections([])
+        }, 2000)
+      }, 3000)
+    }
+  }, [searchParams])
 
   const fetchInspections = async () => {
     try {
@@ -59,6 +85,60 @@ export default function InspectionsPage() {
       
       if (!userData.user) {
         throw new Error('User not authenticated')
+      }
+
+      // Fetch seller information separately
+      let sellerInfo = null
+      try {
+        // First try to get from sellers table
+        const { data: sellerData } = await supabase
+          .from('sellers')
+          .select('*')
+          .eq('id', userData.user.id)
+          .single()
+        
+        if (sellerData) {
+          sellerInfo = {
+            ...sellerData,
+            user_email: userData.user.email // Add the actual user email
+          }
+        }
+      } catch (err) {
+        // If sellers table doesn't exist or no data, try seller_settings
+        try {
+          const { data: settingsData } = await supabase
+            .from('seller_settings')
+            .select('*')
+            .eq('seller_id', userData.user.id)
+            .single()
+          
+          if (settingsData) {
+            sellerInfo = {
+              company_name: settingsData.company_name,
+              full_name: settingsData.company_name,
+              business_email: settingsData.business_email || userData.user.email,
+              email: settingsData.business_email || userData.user.email,
+              business_phone: settingsData.business_phone || '',
+              phone_number: settingsData.business_phone || '',
+              user_email: userData.user.email // Add the actual user email
+            }
+          }
+        } catch (settingsErr) {
+          console.log('Could not fetch seller settings')
+        }
+      }
+
+      // If still no seller info, use user email
+      if (!sellerInfo) {
+        sellerInfo = {
+          company_name: 'Your Company',
+          full_name: userData.user.email?.split('@')[0] || 'User',
+          business_email: userData.user.email,
+          email: userData.user.email,
+          business_phone: '',
+          phone_number: '',
+          user_email: userData.user.email // Add the actual user email
+        }
       }
 
       const { data, error } = await supabase
@@ -124,8 +204,14 @@ export default function InspectionsPage() {
         return
       }
 
+      // Add seller info to each inspection
+      const inspectionsWithSeller = (data || []).map(inspection => ({
+        ...inspection,
+        seller: sellerInfo
+      }))
+      
       // Group inspections by matching criteria (same agent, date, and notes)
-      const groupedInspections = groupInspectionsByBatch(data || [])
+      const groupedInspections = groupInspectionsByBatch(inspectionsWithSeller)
       setInspections(groupedInspections)
     } catch (error) {
       console.error('Error in fetchInspections:', error)
@@ -223,70 +309,206 @@ export default function InspectionsPage() {
   const generateInspectionPDF = async (inspection) => {
     const { jsPDF } = await import('jspdf')
     const doc = new jsPDF()
-
-    // Add header
+    
+    // Set up the document header
     doc.setFontSize(20)
-    doc.text('Inspection Report', 20, 20)
+    doc.text('INSPECTION REQUEST', 105, 20, { align: 'center' })
     
-    // Add inspection details
     doc.setFontSize(12)
-    doc.text(`Inspection Number: ${inspection.inspection_number}`, 20, 40)
-    doc.text(`Date: ${inspection.scheduled_date ? new Date(inspection.scheduled_date).toLocaleDateString() : '-'}`, 20, 50)
-    doc.text(`Status: ${statusConfig[inspection.status]?.label || inspection.status}`, 20, 60)
-    doc.text(`Type: Post-Production`, 20, 70)
+    doc.text(`Inspection Number: ${inspection.inspection_number}`, 105, 30, { align: 'center' })
+    doc.text(`Scheduled Date: ${inspection.scheduled_date ? new Date(inspection.scheduled_date).toLocaleDateString() : '-'}`, 105, 38, { align: 'center' })
+    doc.text(`Status: ${statusConfig[inspection.status]?.label || inspection.status}`, 105, 46, { align: 'center' })
+    doc.text(`Type: Post-Production Inspection`, 105, 54, { align: 'center' })
     
-    // Add inspector info
-    doc.text('Inspector:', 20, 90)
-    doc.text(inspection.inspection_agent?.vendor_name || '-', 30, 100)
-    if (inspection.inspection_agent?.contact_name) {
-      doc.text(`Contact: ${inspection.inspection_agent.contact_name}`, 30, 110)
-    }
+    // Add a line
+    doc.setLineWidth(0.5)
+    doc.line(20, 60, 190, 60)
     
-    // Add supplier info
+    // Get unique suppliers
     const suppliers = inspection.purchase_orders?.length > 0
       ? [...new Map(
           inspection.purchase_orders
             .filter(po => po?.supplier)
             .map(po => [po.supplier.id, po.supplier])
         ).values()]
-      : []
+      : [inspection.purchase_order?.supplier].filter(Boolean)
     
-    let yPos = 130
-    doc.text('Supplier(s):', 20, yPos)
-    suppliers.forEach(supplier => {
-      yPos += 10
-      doc.text(`${supplier.vendor_name} (${supplier.country || '-'})`, 30, yPos)
-    })
+    let yPos = 70
     
-    // Add purchase orders with items
-    yPos += 20
-    doc.text('Purchase Orders & Items:', 20, yPos)
-    const orders = inspection.purchase_orders?.length > 0 ? inspection.purchase_orders : [inspection.purchase_order]
-    orders.forEach(po => {
-      if (po) {
-        yPos += 10
-        doc.setFont(undefined, 'bold')
-        doc.text(`${po.po_number}:`, 30, yPos)
-        doc.setFont(undefined, 'normal')
-        
-        if (po.items && po.items.length > 0) {
-          po.items.forEach(item => {
-            yPos += 8
-            doc.text(`${item.product?.sku || 'SKU'} - ${item.product?.product_name || 'Unknown'}: ${item.quantity} ${item.product?.unit_of_measure || 'units'}`, 40, yPos)
-          })
+    // Requester (Seller) info - Left side
+    doc.setFontSize(14)
+    doc.setFont(undefined, 'bold')
+    doc.text('REQUESTER', 20, yPos)
+    
+    doc.setFontSize(11)
+    doc.setFont(undefined, 'normal')
+    yPos += 8
+    
+    // Get seller info from the inspection
+    const seller = inspection.seller || {}
+    
+    // Show company name
+    doc.setFont(undefined, 'bold')
+    doc.text(seller.company_name || 'Company Name', 20, yPos)
+    doc.setFont(undefined, 'normal')
+    yPos += 6
+    
+    // Show the person who created the request
+    if (seller.full_name) {
+      doc.text(`Requested by: ${seller.full_name}`, 20, yPos)
+      yPos += 6
+    }
+    
+    // Show requester's email (actual user email)
+    if (seller.user_email) {
+      doc.text(`Requester Email: ${seller.user_email}`, 20, yPos)
+      yPos += 6
+    }
+    
+    // Show business email if different from user email
+    if (seller.business_email && seller.business_email !== seller.user_email) {
+      doc.text(`Business Email: ${seller.business_email}`, 20, yPos)
+      yPos += 6
+    }
+    if (seller.business_phone || seller.phone_number) {
+      doc.text(`Phone: ${seller.business_phone || seller.phone_number}`, 20, yPos)
+    }
+    
+    // Inspection Agency info - Right side
+    yPos = 70
+    doc.setFontSize(14)
+    doc.setFont(undefined, 'bold')
+    doc.text('INSPECTION AGENCY', 110, yPos)
+    
+    doc.setFontSize(11)
+    doc.setFont(undefined, 'normal')
+    yPos += 8
+    
+    const agency = inspection.inspection_agent || {}
+    doc.text(agency.vendor_name || 'Agency Name', 110, yPos)
+    yPos += 6
+    
+    if (agency.contact_name) {
+      doc.text(`Contact: ${agency.contact_name}`, 110, yPos)
+      yPos += 6
+    }
+    if (agency.email) {
+      doc.text(`Email: ${agency.email}`, 110, yPos)
+      yPos += 6
+    }
+    
+    // Supplier info section
+    yPos = Math.max(yPos + 15, 110)
+    doc.setLineWidth(0.3)
+    doc.line(20, yPos - 5, 190, yPos - 5)
+    
+    doc.setFontSize(14)
+    doc.setFont(undefined, 'bold')
+    doc.text('SUPPLIER INFORMATION', 20, yPos)
+    yPos += 8
+    
+    doc.setFontSize(11)
+    doc.setFont(undefined, 'normal')
+    
+    suppliers.forEach((supplier, index) => {
+      if (index > 0) yPos += 10
+      
+      doc.setFont(undefined, 'bold')
+      doc.text(supplier.vendor_name || 'Supplier Name', 20, yPos)
+      doc.setFont(undefined, 'normal')
+      yPos += 6
+      
+      if (supplier.contact_name) {
+        doc.text(`Contact: ${supplier.contact_name}`, 20, yPos)
+        yPos += 6
+      }
+      if (supplier.email) {
+        doc.text(`Email: ${supplier.email}`, 20, yPos)
+        yPos += 6
+      }
+      if (supplier.phone) {
+        doc.text(`Phone: ${supplier.phone}`, 20, yPos)
+        yPos += 6
+      }
+      if (supplier.wechat) {
+        doc.text(`WeChat: ${supplier.wechat}`, 20, yPos)
+        yPos += 6
+      }
+      if (supplier.address) {
+        doc.text(`Address: ${supplier.address}`, 20, yPos)
+        yPos += 6
+        if (supplier.country) {
+          doc.text(`Country: ${supplier.country}`, 20, yPos)
+          yPos += 6
         }
       }
     })
     
-    // Add SKU summary
+    // Items to inspect section - table format
     yPos += 15
-    doc.setFontSize(12)
+    doc.setLineWidth(0.3)
+    doc.line(20, yPos - 5, 190, yPos - 5)
+    
+    doc.setFontSize(14)
     doc.setFont(undefined, 'bold')
-    doc.text('Total Items to Inspect:', 20, yPos)
+    doc.text('ITEMS TO INSPECT', 20, yPos)
+    yPos += 10
+    
+    // Table headers
+    doc.setFontSize(11)
+    doc.setFont(undefined, 'bold')
+    doc.text('PO Number', 20, yPos)
+    doc.text('SKU', 60, yPos)
+    doc.text('Product Name', 85, yPos)
+    doc.text('Quantity', 155, yPos)
+    
+    doc.line(20, yPos + 2, 190, yPos + 2)
+    yPos += 8
+    
+    // Table content
     doc.setFont(undefined, 'normal')
     doc.setFontSize(10)
     
+    const orders = inspection.purchase_orders?.length > 0 ? inspection.purchase_orders : [inspection.purchase_order]
+    orders.forEach(po => {
+      if (po && po.items && po.items.length > 0) {
+        po.items.forEach(item => {
+          if (yPos > 270) {
+            doc.addPage()
+            yPos = 20
+          }
+          
+          doc.text(po.po_number || '-', 20, yPos)
+          doc.text(item.product?.sku || '-', 60, yPos)
+          
+          // Truncate product name if too long
+          const productName = item.product?.product_name || 'Unknown'
+          const maxNameLength = 35
+          const displayName = productName.length > maxNameLength 
+            ? productName.substring(0, maxNameLength) + '...' 
+            : productName
+          doc.text(displayName, 85, yPos)
+          
+          doc.text(`${item.quantity} ${item.product?.unit_of_measure || 'units'}`, 155, yPos)
+          yPos += 6
+        })
+      }
+    })
+    
+    // Summary totals
+    yPos += 10
+    doc.line(20, yPos - 5, 190, yPos - 5)
+    doc.setFontSize(11)
+    doc.setFont(undefined, 'bold')
+    doc.text('INSPECTION SUMMARY', 20, yPos)
+    yPos += 8
+    
+    doc.setFont(undefined, 'normal')
+    doc.setFontSize(10)
+    
+    // Calculate totals by SKU
     const skuTotals = {}
+    let totalItems = 0
     orders.forEach(po => {
       po?.items?.forEach(item => {
         const sku = item.product?.sku || 'Unknown'
@@ -298,31 +520,69 @@ export default function InspectionsPage() {
           }
         }
         skuTotals[sku].quantity += item.quantity
+        totalItems += item.quantity
       })
     })
     
+    // Display SKU totals
     Object.entries(skuTotals).forEach(([sku, data]) => {
-      yPos += 8
-      doc.text(`${sku} - ${data.name}: ${data.quantity} ${data.unit}`, 30, yPos)
+      if (yPos > 270) {
+        doc.addPage()
+        yPos = 20
+      }
+      doc.text(`${sku}: ${data.quantity} ${data.unit} - ${data.name}`, 30, yPos)
+      yPos += 6
     })
+    
+    yPos += 5
+    doc.setFont(undefined, 'bold')
+    doc.text(`Total Items: ${totalItems}`, 30, yPos)
+    doc.text(`Total SKUs: ${Object.keys(skuTotals).length}`, 110, yPos)
     
     // Add notes if any
     if (inspection.notes) {
-      yPos += 20
-      doc.setFontSize(12)
-      doc.text('Notes:', 20, yPos)
-      yPos += 10
+      if (yPos > 240) {
+        doc.addPage()
+        yPos = 20
+      }
+      
+      yPos += 15
+      doc.setLineWidth(0.3)
+      doc.line(20, yPos - 5, 190, yPos - 5)
+      
+      doc.setFontSize(11)
+      doc.setFont(undefined, 'bold')
+      doc.text('NOTES', 20, yPos)
+      yPos += 8
+      
+      doc.setFont(undefined, 'normal')
+      doc.setFontSize(10)
       
       // Word wrap notes
       const splitNotes = doc.splitTextToSize(inspection.notes, 170)
       splitNotes.forEach(line => {
+        if (yPos > 270) {
+          doc.addPage()
+          yPos = 20
+        }
         doc.text(line, 20, yPos)
         yPos += 6
       })
     }
     
-    // Save the PDF
-    doc.save(`inspection-${inspection.inspection_number}.pdf`)
+    // Footer on last page
+    doc.setFontSize(10)
+    doc.setTextColor(128)
+    doc.text(`Generated on ${new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`, 105, 280, { align: 'center' })
+    
+    // Save the PDF with proper filename
+    doc.save(`Inspection-Request-${inspection.inspection_number}.pdf`)
   }
 
 
@@ -380,12 +640,21 @@ export default function InspectionsPage() {
             <TableBody>
               {inspections.map((inspection) => {
                 const isExpanded = expandedRows.includes(inspection.id)
+                const isHighlighted = highlightedInspections.some(id => 
+                  inspection.all_inspections?.some(i => i.id === id) || inspection.id === id
+                )
                 const StatusIcon = statusConfig[inspection.status]?.icon || Clock
                 const type = inspectionTypes.find(t => t.value === inspection.inspection_type)
                 
                 return (
                   <React.Fragment key={inspection.id}>
-                    <TableRow>
+                    <TableRow 
+                      className={`transition-all duration-500 ${
+                        isHighlighted 
+                          ? 'bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500 ring-opacity-50' 
+                          : ''
+                      }`}
+                    >
                       <TableCell>
                         <Button
                           variant="ghost"

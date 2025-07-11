@@ -14,6 +14,7 @@ import ScheduleInspectionDialog from './schedule-inspection-dialog'
 import { useRouter } from 'next/navigation'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 const statusConfig = {
   draft: { label: 'Draft', color: 'secondary', icon: FileText },
@@ -35,6 +36,7 @@ export default function PurchaseOrdersPage() {
   const [inspectionDialogOpen, setInspectionDialogOpen] = useState(false)
   const [inspectionData, setInspectionData] = useState(null)
   const [inspections, setInspections] = useState([])
+  const [inspectionMode, setInspectionMode] = useState(false)
   const [stats, setStats] = useState({
     total: 0,
     draft: 0,
@@ -46,6 +48,14 @@ export default function PurchaseOrdersPage() {
     loadPurchaseOrders()
     loadInspections()
   }, [statusFilter])
+
+  // Reload inspections when orders change
+  useEffect(() => {
+    if (orders.length > 0 && inspections.length === 0) {
+      loadInspections()
+    }
+  }, [orders])
+
 
   const loadPurchaseOrders = async () => {
     setLoading(true)
@@ -87,9 +97,10 @@ export default function PurchaseOrdersPage() {
         .from('inspections')
         .select('id, purchase_order_id, status, inspection_number')
         .eq('seller_id', userData.user.id)
-        .not('status', 'in', '("cancelled","archived")')
 
-      if (!error && data) {
+      if (error) {
+        console.error('Error loading inspections:', error)
+      } else if (data) {
         setInspections(data)
       }
     } catch (error) {
@@ -134,29 +145,31 @@ export default function PurchaseOrdersPage() {
   const handleSelectOrder = (orderId, checked) => {
     const order = orders.find(o => o.id === orderId)
     
-    if (checked) {
-      // Check if order already has an inspection
-      const hasInspection = inspections.some(i => i.purchase_order_id === orderId)
-      if (hasInspection) {
-        toast.error('This order already has an inspection scheduled')
-        return
-      }
-      
-      // Check if order status allows inspection
-      if (order.status === 'draft') {
-        toast.error('Draft orders cannot be scheduled for inspection')
-        return
-      }
-      if (order.status === 'cancelled') {
-        toast.error('Cancelled orders cannot be scheduled for inspection')
-        return
-      }
-      
-      // If this is the first selection, just add it
-      if (selectedOrders.length === 0) {
-        setSelectedOrders([orderId])
-      } else {
-        // Check if all currently selected orders have the same supplier as this one
+    if (inspectionMode) {
+      // In inspection mode, apply inspection-specific validation
+      if (checked) {
+        // Check if order already has an inspection
+        const hasInspection = inspections.some(i => i.purchase_order_id === orderId)
+        if (hasInspection) {
+          toast.error('This order already has an inspection scheduled')
+          return
+        }
+        
+        // Check if order status allows inspection
+        if (order.status === 'draft') {
+          toast.error('Draft orders cannot be scheduled for inspection')
+          return
+        }
+        if (order.status === 'cancelled') {
+          toast.error('Cancelled orders cannot be scheduled for inspection')
+          return
+        }
+        
+        // If this is the first selection, just add it
+        if (selectedOrders.length === 0) {
+          setSelectedOrders([orderId])
+        } else {
+          // Check if all currently selected orders have the same supplier as this one
         const selectedOrdersData = orders.filter(o => selectedOrders.includes(o.id))
         const currentSupplierId = selectedOrdersData[0]?.supplier_id
         
@@ -169,7 +182,15 @@ export default function PurchaseOrdersPage() {
     } else {
       setSelectedOrders(selectedOrders.filter(id => id !== orderId))
     }
+  } else {
+    // Normal mode - just toggle selection without restrictions
+    if (checked) {
+      setSelectedOrders([...selectedOrders, orderId])
+    } else {
+      setSelectedOrders(selectedOrders.filter(id => id !== orderId))
+    }
   }
+}
 
   const handleSelectAll = (checked) => {
     if (checked) {
@@ -266,22 +287,59 @@ export default function PurchaseOrdersPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            {selectedOrders.length > 0 && (
-              <Button
-                variant="outline"
-                onClick={handleScheduleInspection}
-              >
-                <ClipboardCheck className="h-4 w-4 mr-2" />
-                Schedule Inspection ({selectedOrders.length})
-              </Button>
+            {inspectionMode ? (
+              <>
+                <Button
+                  onClick={() => {
+                    setInspectionMode(false)
+                    setSelectedOrders([])
+                  }}
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleScheduleInspection}
+                  variant="default"
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={selectedOrders.length === 0}
+                >
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Schedule Inspection {selectedOrders.length > 0 && `(${selectedOrders.length})`}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  onClick={() => {
+                    setInspectionMode(true)
+                    setSelectedOrders([])
+                  }}
+                  variant="outline"
+                >
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Create New Inspection
+                </Button>
+                <Button onClick={() => setCreateDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Purchase Order
+                </Button>
+              </>
             )}
-            <Button onClick={() => setCreateDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Purchase Order
-            </Button>
           </div>
         </div>
       </div>
+
+      {/* Inspection Mode Banner */}
+      {inspectionMode && (
+        <Alert className="mb-6 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+          <ClipboardCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="text-blue-900 dark:text-blue-100">
+            <strong>Inspection Mode:</strong> Select orders from the same supplier to create an inspection. 
+            Orders with existing inspections cannot be selected.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -395,27 +453,32 @@ export default function PurchaseOrdersPage() {
                 let canSelect = true
                 let disabledReason = ''
                 
-                // Check if already has inspection
-                if (orderInspection) {
-                  canSelect = false
-                  disabledReason = 'Already has inspection'
-                } else if (order.status === 'draft' || order.status === 'cancelled') {
-                  canSelect = false
-                  disabledReason = order.status === 'draft' ? 'Draft orders cannot be inspected' : 'Cancelled orders cannot be inspected'
-                } else if (selectedOrders.length > 0 && !isSelected) {
-                  const selectedOrdersData = orders.filter(o => selectedOrders.includes(o.id))
-                  const currentSupplierId = selectedOrdersData[0]?.supplier_id
-                  
-                  if (order.supplier_id !== currentSupplierId) {
+                if (inspectionMode) {
+                  // In inspection mode, apply restrictions
+                  if (orderInspection) {
                     canSelect = false
-                    disabledReason = 'Different supplier'
+                    disabledReason = 'Already has inspection'
+                  } else if (order.status === 'draft' || order.status === 'cancelled') {
+                    canSelect = false
+                    disabledReason = order.status === 'draft' ? 'Draft orders cannot be inspected' : 'Cancelled orders cannot be inspected'
+                  } else if (selectedOrders.length > 0 && !isSelected) {
+                    const selectedOrdersData = orders.filter(o => selectedOrders.includes(o.id))
+                    const currentSupplierId = selectedOrdersData[0]?.supplier_id
+                    
+                    if (order.supplier_id !== currentSupplierId) {
+                      canSelect = false
+                      disabledReason = 'Different supplier'
+                    }
                   }
                 }
+                // In normal mode, all checkboxes are enabled
                 
                 return (
                   <TableRow
                     key={order.id}
-                    className={`hover:bg-gray-50 dark:hover:bg-slate-800 ${!canSelect && !isSelected ? 'opacity-50' : ''}`}
+                    className={`hover:bg-gray-50 dark:hover:bg-slate-800 ${
+                      inspectionMode && !canSelect && !isSelected ? 'opacity-50' : ''
+                    }`}
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
@@ -473,9 +536,9 @@ export default function PurchaseOrdersPage() {
                     <TableCell className="cursor-pointer" onClick={() => handleRowClick(order.id)}>
                       {orderInspection ? (
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="secondary" className="text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800">
                             <Eye className="h-3 w-3 mr-1" />
-                            {orderInspection.inspection_number}
+                            {orderInspection.inspection_number || 'No Number'}
                           </Badge>
                         </div>
                       ) : (
@@ -500,11 +563,15 @@ export default function PurchaseOrdersPage() {
         open={inspectionDialogOpen}
         onOpenChange={setInspectionDialogOpen}
         inspectionGroups={inspectionData}
-        onSuccess={() => {
+        onSuccess={(inspectionIds) => {
           setSelectedOrders([])
-          loadPurchaseOrders()
-          loadInspections()
+          setInspectionMode(false)
           toast.success('Inspection(s) scheduled successfully')
+          
+          // Redirect to inspections page with highlight parameter
+          if (inspectionIds && inspectionIds.length > 0) {
+            router.push(`/seller/inspections?highlight=${inspectionIds.join(',')}`)
+          }
         }}
       />
     </div>
