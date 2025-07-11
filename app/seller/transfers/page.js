@@ -84,32 +84,39 @@ export default function TransfersPage() {
     // Check for transfer creation from PO
     const createTransfer = searchParams.get('create')
     const transferType = searchParams.get('type')
-    const poNumbers = searchParams.get('po')
+    const poNumber = searchParams.get('po')
+    const isInstant = searchParams.get('instant') === 'true'
 
-    if (createTransfer === 'true' && transferType && poNumbers) {
-      // Set transfer type
-      setFormData(prev => ({
-        ...prev,
-        transfer_type: transferType,
-        purchase_order_id: poNumbers,
-        from_location: 'Supplier Warehouse',
-        from_location_type: 'supplier_warehouse',
-        to_location: '',
-        to_location_type: '3pl_warehouse',
-        notes: `Receiving inventory from Purchase Orders: ${poNumbers}`
-      }))
-      
-      // Open dialog
-      setCreateDialogOpen(true)
-      
-      // Load PO data to get items
-      loadPurchaseOrderData(poNumbers)
+    if (createTransfer === 'true' && transferType && poNumber) {
+      if (isInstant) {
+        // For instant transfers, create it immediately
+        createInstantTransfer(poNumber)
+      } else {
+        // Set transfer type
+        setFormData(prev => ({
+          ...prev,
+          transfer_type: transferType,
+          purchase_order_id: poNumber,
+          from_location: 'Supplier Warehouse',
+          from_location_type: 'supplier_warehouse',
+          to_location: '',
+          to_location_type: '3pl_warehouse',
+          notes: `Receiving inventory from Purchase Order: ${poNumber}`
+        }))
+        
+        // Open dialog
+        setCreateDialogOpen(true)
+        
+        // Load PO data to get items
+        loadPurchaseOrderData(poNumber)
+      }
       
       // Clear URL parameters
       const newUrl = new URL(window.location.href)
       newUrl.searchParams.delete('create')
       newUrl.searchParams.delete('type')
       newUrl.searchParams.delete('po')
+      newUrl.searchParams.delete('instant')
       window.history.replaceState({}, '', newUrl)
     }
   }, [searchParams])
@@ -207,57 +214,108 @@ export default function TransfersPage() {
     setStats(stats)
   }
 
-  const loadPurchaseOrderData = async (poNumbers) => {
+  const loadPurchaseOrderData = async (poNumber) => {
     try {
-      const poNumberArray = poNumbers.split(',')
-      
       // Fetch PO data
       const response = await fetch('/api/purchase-orders')
       const allOrders = await response.json()
       
       if (response.ok) {
-        // Filter for the specific POs
-        const selectedOrders = allOrders.filter(order => 
-          poNumberArray.includes(order.po_number)
-        )
+        // Find the specific PO
+        const selectedOrder = allOrders.find(order => order.po_number === poNumber)
         
-        // Aggregate items from all selected POs
-        const aggregatedItems = []
-        
-        selectedOrders.forEach(order => {
-          if (order.items && order.items.length > 0) {
-            order.items.forEach(item => {
-              const existingItem = aggregatedItems.find(i => 
-                i.sku === item.product?.sku
-              )
-              
-              if (existingItem) {
-                existingItem.quantity += item.quantity
-              } else {
-                aggregatedItems.push({
-                  sku: item.product?.sku || 'Unknown',
-                  product_name: item.product?.product_name || 'Unknown Product',
-                  quantity: item.quantity,
-                  unit: item.product?.unit_of_measure || 'units'
-                })
-              }
+        if (selectedOrder) {
+          // Collect items from the PO
+          const items = []
+          
+          if (selectedOrder.items && selectedOrder.items.length > 0) {
+            selectedOrder.items.forEach(item => {
+              items.push({
+                sku: item.product?.sku || 'Unknown',
+                product_name: item.product?.product_name || 'Unknown Product',
+                quantity: item.quantity,
+                unit: item.product?.unit_of_measure || 'units'
+              })
             })
           }
-        })
-        
-        // Update form with items and supplier info
-        const firstOrder = selectedOrders[0]
-        if (firstOrder) {
+          
+          // Update form with items and supplier info
           setFormData(prev => ({
             ...prev,
-            from_location: firstOrder.supplier?.vendor_name || 'Supplier Warehouse',
-            items: aggregatedItems
+            from_location: selectedOrder.supplier?.vendor_name || 'Supplier Warehouse',
+            items: items
           }))
+          
+          return selectedOrder
         }
       }
     } catch (error) {
       console.error('Error loading PO data:', error)
       toast.error('Failed to load purchase order data')
+    }
+    return null
+  }
+
+  const createInstantTransfer = async (poNumber) => {
+    try {
+      // Load PO data
+      const poData = await loadPurchaseOrderData(poNumber)
+      
+      if (!poData) {
+        toast.error('Failed to load purchase order data')
+        return
+      }
+      
+      // Generate transfer number
+      const transferNumber = `TRF-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
+      
+      // Create instant transfer data
+      const transferData = {
+        transfer_number: transferNumber,
+        transfer_type: 'in',
+        purchase_order_id: poNumber,
+        purchase_order_number: poNumber,
+        from_location: poData.supplier?.vendor_name || 'Supplier',
+        from_location_type: 'supplier',
+        to_location: `${poData.supplier?.vendor_name || 'Supplier'} Warehouse`,
+        to_location_type: 'supplier_warehouse',
+        status: 'arrived', // Instant transfer - already arrived
+        actual_arrival: new Date().toISOString(),
+        notes: `Inventory received from Purchase Order: ${poNumber}`,
+        items: poData.items?.map(item => ({
+          sku: item.product?.sku || 'Unknown',
+          product_name: item.product?.product_name || 'Unknown Product',
+          quantity: item.quantity
+        })) || []
+      }
+      
+      // In a real implementation, this would save to the database
+      // For now, show success message
+      const totalQuantity = transferData.items.reduce((sum, item) => sum + item.quantity, 0)
+      
+      toast.success(
+        `Inventory received successfully! Transfer ${transferNumber} created with ${transferData.items.length} items (${totalQuantity} units) at ${transferData.to_location}.`
+      )
+      
+      // Add the new transfer to the mock list temporarily
+      // In a real implementation, this would reload from the database
+      const newTransfer = {
+        id: Date.now().toString(),
+        ...transferData,
+        created_at: new Date().toISOString(),
+        estimated_arrival: new Date().toISOString(),
+        tracking_number: '',
+        carrier: 'Internal Transfer'
+      }
+      
+      setTransfers(prev => [newTransfer, ...prev])
+      
+      // Recalculate stats
+      const updatedTransfers = [newTransfer, ...transfers]
+      calculateStats(updatedTransfers)
+    } catch (error) {
+      console.error('Error creating instant transfer:', error)
+      toast.error('Failed to receive inventory')
     }
   }
 

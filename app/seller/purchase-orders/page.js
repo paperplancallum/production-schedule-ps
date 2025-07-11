@@ -184,17 +184,18 @@ export default function PurchaseOrdersPage() {
         setSelectedOrders(selectedOrders.filter(id => id !== orderId))
       }
     } else if (transferMode) {
-      // In transfer mode, apply transfer-specific validation
+      // In transfer mode, only allow single selection
       if (checked) {
         // Check if order status allows transfer
         if (order.status !== 'complete' && order.status !== 'approved' && order.status !== 'in_progress') {
-          toast.error('Only approved, in progress, or completed orders can be transferred')
+          toast.error('Only approved, in progress, or completed orders can be received')
           return
         }
         
-        setSelectedOrders([...selectedOrders, orderId])
+        // Only allow single selection in transfer mode
+        setSelectedOrders([orderId])
       } else {
-        setSelectedOrders(selectedOrders.filter(id => id !== orderId))
+        setSelectedOrders([])
       }
     } else {
       // Normal mode - just toggle selection without restrictions
@@ -235,25 +236,20 @@ export default function PurchaseOrdersPage() {
 
   const handleCreateTransfer = () => {
     if (selectedOrders.length === 0) {
-      toast.error('Please select at least one purchase order')
+      toast.error('Please select a purchase order')
       return
     }
     
-    const selectedOrderData = orders.filter(order => selectedOrders.includes(order.id))
+    const selectedOrder = orders.find(order => order.id === selectedOrders[0])
     
-    // Check if all selected orders are complete or approved
-    const invalidOrders = selectedOrderData.filter(order => 
-      order.status !== 'complete' && order.status !== 'approved' && order.status !== 'in_progress'
-    )
-    
-    if (invalidOrders.length > 0) {
-      toast.error('Only approved, in progress, or completed orders can be transferred')
+    // Check if order is complete or approved
+    if (selectedOrder.status !== 'complete' && selectedOrder.status !== 'approved' && selectedOrder.status !== 'in_progress') {
+      toast.error('Only approved, in progress, or completed orders can be received')
       return
     }
     
-    // Navigate to transfers page with PO data
-    const poNumbers = selectedOrderData.map(o => o.po_number).join(',')
-    router.push(`/seller/transfers?create=true&type=in&po=${encodeURIComponent(poNumbers)}`)
+    // Navigate to transfers page with PO data and instant flag
+    router.push(`/seller/transfers?create=true&type=in&po=${encodeURIComponent(selectedOrder.po_number)}&instant=true`)
   }
 
   const prepareInspectionData = () => {
@@ -363,7 +359,7 @@ export default function PurchaseOrdersPage() {
                   disabled={selectedOrders.length === 0}
                 >
                   <ArrowDownToLine className="h-4 w-4 mr-2" />
-                  Create Transfer {selectedOrders.length > 0 && `(${selectedOrders.length})`}
+                  Receive into System
                 </Button>
               </>
             ) : (
@@ -414,8 +410,8 @@ export default function PurchaseOrdersPage() {
         <Alert className="mb-6 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
           <ArrowDownToLine className="h-4 w-4 text-green-600 dark:text-green-400" />
           <AlertDescription className="text-green-900 dark:text-green-100">
-            <strong>Receive Inventory Mode:</strong> Select approved or completed orders to create incoming transfers. 
-            This will record inventory receipt from your suppliers.
+            <strong>Receive Inventory Mode:</strong> Select a single approved or completed order to receive into the system. 
+            This will record inventory at the supplier warehouse, ready for future transfers.
           </AlertDescription>
         </Alert>
       )}
@@ -480,11 +476,15 @@ export default function PurchaseOrdersPage() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">
-                <Checkbox
-                  checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
-                  onCheckedChange={handleSelectAll}
-                  aria-label="Select all"
-                />
+                {!transferMode ? (
+                  <Checkbox
+                    checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all"
+                  />
+                ) : (
+                  <span className="text-xs">Select</span>
+                )}
               </TableHead>
               <TableHead>PO Number</TableHead>
               <TableHead>Supplier</TableHead>
@@ -570,7 +570,7 @@ export default function PurchaseOrdersPage() {
                         checked={isSelected}
                         onCheckedChange={(checked) => handleSelectOrder(order.id, checked)}
                         aria-label={`Select ${order.po_number}`}
-                        disabled={!canSelect && !isSelected}
+                        disabled={!canSelect && !isSelected && !transferMode}
                       />
                     </TableCell>
                     <TableCell 
