@@ -84,13 +84,44 @@ export default async function VendorPurchaseOrderPage({ params }) {
     .eq('purchase_order_id', order.id)
     .order('created_at', { ascending: false })
 
+  // Fetch user details for status changes
+  const statusHistoryWithUsers = await Promise.all(
+    (statusHistory || []).map(async (history) => {
+      if (!history.changed_by) return history
+      
+      // Try to find if it's a seller
+      const { data: seller } = await supabase
+        .from('sellers')
+        .select('id, company_name')
+        .eq('id', history.changed_by)
+        .single()
+      
+      if (seller) {
+        return { ...history, changed_by_user: { type: 'seller', name: seller.company_name } }
+      }
+      
+      // Try to find if it's a vendor
+      const { data: vendor } = await supabase
+        .from('vendors')
+        .select('id, vendor_name')
+        .eq('user_id', history.changed_by)
+        .single()
+      
+      if (vendor) {
+        return { ...history, changed_by_user: { type: 'vendor', name: vendor.vendor_name } }
+      }
+      
+      return history
+    })
+  )
+
   // Combine all data
   const orderWithDetails = {
     ...order,
     vendor,
     seller: seller || {},
     items: itemsWithDetails || [],
-    status_history: statusHistory || []
+    status_history: statusHistoryWithUsers || []
   }
 
   return <VendorPurchaseOrderDetail order={orderWithDetails} />

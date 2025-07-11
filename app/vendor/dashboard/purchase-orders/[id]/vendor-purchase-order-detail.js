@@ -356,6 +356,11 @@ export default function VendorPurchaseOrderDetail({ order: initialOrder }) {
                           </div>
                           <p className="text-xs text-gray-500">
                             {formatDateTime(history.created_at)}
+                            {history.changed_by_user && (
+                              <span className="ml-2">
+                                by {history.changed_by_user.name}
+                              </span>
+                            )}
                           </p>
                           {history.notes && (
                             <p className="text-sm text-gray-600 mt-1">{history.notes}</p>
