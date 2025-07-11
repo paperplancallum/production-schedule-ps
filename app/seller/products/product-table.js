@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import CreatePurchaseOrderDialog from '@/app/seller/purchase-orders/create-purchase-order-dialog'
 
 // Component for the expanded row content
 function ProductSuppliers({ productId, productName, onPriceUpdate }) {
@@ -849,23 +850,106 @@ const columns = [
   },
   {
     id: 'select',
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
-    ),
+    header: ({ table }) => {
+      const selectedRowIds = Object.keys(table.options.state.rowSelection || {})
+      const hasSelection = selectedRowIds.length > 0
+      
+      // Get the first selected supplier ID
+      let currentFirstSupplierId = null
+      if (hasSelection) {
+        const firstSelectedProduct = table.options.data.find(p => 
+          selectedRowIds.includes(p.id)
+        )
+        currentFirstSupplierId = firstSelectedProduct?.primary_supplier_id
+      }
+      
+      // Count how many products can be selected (same supplier)
+      const selectableProducts = currentFirstSupplierId
+        ? table.options.data.filter(p => p.primary_supplier_id === currentFirstSupplierId)
+        : table.options.data
+      
+      const selectedCount = selectedRowIds.length
+      const isAllSelected = selectableProducts.length > 0 && 
+        selectableProducts.every(p => selectedRowIds.includes(p.id))
+      const isIndeterminate = selectedCount > 0 && !isAllSelected
+      
+      return (
+        <Checkbox
+          checked={isAllSelected || (isIndeterminate && "indeterminate")}
+          onCheckedChange={(value) => {
+            if (value) {
+              // Select all products from the same supplier
+              const newSelection = {}
+              selectableProducts.forEach(product => {
+                newSelection[product.id] = true
+              })
+              table.setRowSelection(newSelection)
+              
+              // Set first supplier if selecting from empty
+              if (!hasSelection && selectableProducts.length > 0) {
+                table.options.meta?.onFirstSupplierChange?.(selectableProducts[0].primary_supplier_id)
+              }
+            } else {
+              // Deselect all
+              table.setRowSelection({})
+              table.options.meta?.onFirstSupplierChange?.(null)
+            }
+          }}
+          aria-label="Select all"
+        />
+      )
+    },
+    cell: ({ row, table }) => {
+      const product = row.original
+      const isChecked = row.getIsSelected()
+      const selectedRowIds = Object.keys(table.options.state.rowSelection || {})
+      const hasSelection = selectedRowIds.length > 0
+      
+      // Get the first selected supplier ID
+      let currentFirstSupplierId = null
+      if (hasSelection) {
+        const firstSelectedProduct = table.options.data.find(p => 
+          selectedRowIds.includes(p.id)
+        )
+        currentFirstSupplierId = firstSelectedProduct?.primary_supplier_id
+      }
+      
+      // Disable if product has different supplier than first selected
+      const isDisabled = hasSelection && 
+        !isChecked && 
+        product.primary_supplier_id !== currentFirstSupplierId
+      
+      return (
+        <Checkbox
+          checked={isChecked}
+          onCheckedChange={(value) => {
+            row.toggleSelected(!!value)
+            
+            // Update first selected supplier when selection changes
+            const newSelection = { ...table.options.state.rowSelection }
+            if (value) {
+              newSelection[row.id] = true
+            } else {
+              delete newSelection[row.id]
+            }
+            
+            const newSelectedIds = Object.keys(newSelection)
+            if (newSelectedIds.length === 0) {
+              table.options.meta?.onFirstSupplierChange?.(null)
+            } else if (newSelectedIds.length === 1) {
+              const firstProduct = table.options.data.find(p => 
+                p.id === newSelectedIds[0]
+              )
+              table.options.meta?.onFirstSupplierChange?.(firstProduct?.primary_supplier_id)
+            }
+          }}
+          disabled={isDisabled}
+          aria-label="Select row"
+          className={isDisabled ? "opacity-50 cursor-not-allowed" : ""}
+          title={isDisabled ? "Can only select products from the same supplier" : ""}
+        />
+      )
+    },
     enableSorting: false,
     enableHiding: false,
   },
@@ -995,6 +1079,9 @@ export function ProductTable() {
   const [isAddingProduct, setIsAddingProduct] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [selectedRows, setSelectedRows] = useState({})
+  const [createPODialogOpen, setCreatePODialogOpen] = useState(false)
+  const [selectedSupplierForPO, setSelectedSupplierForPO] = useState(null)
+  const [firstSelectedSupplierId, setFirstSelectedSupplierId] = useState(null)
   const [formData, setFormData] = useState({
     product_name: '',
     sku: '',
@@ -1218,7 +1305,7 @@ export function ProductTable() {
     setEditingProduct(product)
   }
 
-  const handleCreatePO = (productIds) => {
+  const handleCreatePO = async (productIds) => {
     if (!productIds || productIds.length === 0) {
       toast.error('Please select at least one product')
       return
@@ -1228,25 +1315,38 @@ export function ProductTable() {
     const selectedProducts = products.filter(product => productIds.includes(product.id))
     
     // Check if all products have a primary supplier
-    const productsWithoutSupplier = selectedProducts.filter(product => !product.primary_supplier_name)
+    const productsWithoutSupplier = selectedProducts.filter(product => !product.primary_supplier_id)
     if (productsWithoutSupplier.length > 0) {
       toast.error('Some selected products do not have a primary supplier. Please set a primary supplier first.')
       return
     }
     
-    // Get the primary supplier names
-    const suppliers = [...new Set(selectedProducts.map(product => product.primary_supplier_name))]
+    // Get the unique supplier IDs
+    const supplierIds = [...new Set(selectedProducts.map(product => product.primary_supplier_id))]
     
     // Check if all products have the same primary supplier
-    if (suppliers.length > 1) {
+    if (supplierIds.length > 1) {
       toast.error('Selected products have different suppliers. You can only create a PO for products from the same supplier.')
       return
     }
     
-    // Show info message
-    toast.info('Please go to the Purchase Orders page to create a new PO')
+    // Get the supplier details
+    const supabase = createClient()
+    const { data: supplierData, error } = await supabase
+      .from('vendors')
+      .select('*')
+      .eq('id', supplierIds[0])
+      .single()
     
-    // Clear selection after showing message
+    if (error || !supplierData) {
+      toast.error('Error fetching supplier details')
+      return
+    }
+    
+    // Set the selected supplier and open the dialog
+    setSelectedSupplierForPO(supplierData.id)
+    setCreatePODialogOpen(true)
+    // Clear selection after opening dialog
     setSelectedRows({})
   }
 
@@ -1423,9 +1523,23 @@ export function ProductTable() {
             onEditProduct: openEditSheet,
             onDeleteProduct: handleDeleteProduct,
             onCreatePO: handleCreatePO,
+            onFirstSupplierChange: setFirstSelectedSupplierId,
           }}
         />
       )}
+      
+      <CreatePurchaseOrderDialog
+        open={createPODialogOpen}
+        onOpenChange={setCreatePODialogOpen}
+        defaultSupplierId={selectedSupplierForPO}
+        onSuccess={() => {
+          setCreatePODialogOpen(false)
+          setSelectedSupplierForPO(null)
+          setSelectedRows({})
+          setFirstSelectedSupplierId(null)
+          toast.success('Purchase order created successfully')
+        }}
+      />
     </div>
   )
 }
