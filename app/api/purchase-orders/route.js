@@ -60,7 +60,8 @@ export async function GET(request) {
             product:products(
               id,
               product_name,
-              sku
+              sku,
+              unit_of_measure
             )
           `)
           .eq('purchase_order_id', order.id)

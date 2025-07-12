@@ -304,11 +304,14 @@ export default function CreatePurchaseOrderDialog({ open, onOpenChange, onSucces
       // Reset form
       setFormData({
         supplier_id: '',
-        notes: ''
+        notes: '',
+        trade_terms: 'FOB'
       })
       setItems([])
       onOpenChange(false)
-      router.refresh()
+      
+      // Redirect to purchase orders page with highlight
+      router.push(`/seller/purchase-orders?highlight=${data.id}`)
     } catch (err) {
       setError(err.message)
     } finally {

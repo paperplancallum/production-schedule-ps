@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Plus, Search, Package, Truck, CheckCircle, XCircle, Clock, ArrowRight, Building, Warehouse, Trash2, MoreHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Checkbox } from '@/components/ui/checkbox'
+// Removed Checkbox import - no longer needed
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -31,8 +31,9 @@ import {
 
 const statusConfig = {
   pending: { label: 'Pending', color: 'secondary', icon: Clock },
+  shipped: { label: 'Shipped', color: 'blue', icon: Package },
   in_transit: { label: 'In Transit', color: 'blue', icon: Truck },
-  arrived: { label: 'Arrived', color: 'green', icon: CheckCircle },
+  completed: { label: 'Completed', color: 'green', icon: CheckCircle },
   delayed: { label: 'Delayed', color: 'yellow', icon: Clock },
   cancelled: { label: 'Cancelled', color: 'destructive', icon: XCircle }
 }
@@ -59,12 +60,13 @@ export default function TransfersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [selectedTransfers, setSelectedTransfers] = useState([])
+  // Removed selectedTransfers state - no longer needed
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
+    shipped: 0,
     in_transit: 0,
-    arrived: 0
+    completed: 0
   })
   const [formData, setFormData] = useState({
     transfer_number: '',
@@ -172,8 +174,9 @@ export default function TransfersPage() {
     const stats = {
       total: transferData.length,
       pending: transferData.filter(t => t.status === 'pending').length,
+      shipped: transferData.filter(t => t.status === 'shipped').length,
       in_transit: transferData.filter(t => t.status === 'in_transit').length,
-      arrived: transferData.filter(t => t.status === 'arrived').length
+      completed: transferData.filter(t => t.status === 'completed').length
     }
     setStats(stats)
   }
@@ -286,9 +289,9 @@ export default function TransfersPage() {
           purchase_order_number: poNumber,
           from_location: poData.supplier?.vendor_name || 'Supplier',
           from_location_type: 'supplier',
-          to_location: `${poData.supplier?.vendor_name || 'Supplier'} Warehouse`,
+          to_location: `${poData.supplier?.vendor_name || 'Supplier'} (Warehouse)`,
           to_location_type: 'supplier_warehouse',
-          status: 'arrived',
+          status: 'completed',
           actual_arrival: new Date().toISOString(),
           notes: `Received ${item.product?.sku || 'Unknown SKU'} from PO: ${poNumber}`,
           items: [{
@@ -324,7 +327,7 @@ export default function TransfersPage() {
       
       if (successCount > 0) {
         toast.success(
-          `Inventory received successfully! Created ${successCount} transfer${successCount > 1 ? 's' : ''} (${totalQuantity} total units) at ${poData.supplier?.vendor_name || 'Supplier'} Warehouse.`
+          `Inventory received successfully! Created ${successCount} transfer${successCount > 1 ? 's' : ''} (${totalQuantity} total units) at ${poData.supplier?.vendor_name || 'Supplier'} (Warehouse).`
         )
         
         // Reload transfers to update the UI
@@ -357,19 +360,39 @@ export default function TransfersPage() {
     toast.info(`Transfer ${transferId} details coming soon`)
   }
 
-  const handleSelectTransfer = (transferId, checked) => {
-    if (checked) {
-      setSelectedTransfers([...selectedTransfers, transferId])
-    } else {
-      setSelectedTransfers(selectedTransfers.filter(id => id !== transferId))
-    }
-  }
+  const handleUpdateTransferStatus = async (transferId, newStatus) => {
+    try {
+      const updateData = { status: newStatus }
+      
+      // Add actual arrival date when marking as completed
+      if (newStatus === 'completed') {
+        updateData.actual_arrival = new Date().toISOString()
+      }
+      
+      const response = await fetch(`/api/transfers?id=${transferId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      })
 
-  const handleSelectAll = (checked) => {
-    if (checked) {
-      setSelectedTransfers(filteredTransfers.map(transfer => transfer.id))
-    } else {
-      setSelectedTransfers([])
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update transfer status')
+      }
+
+      const statusMessages = {
+        shipped: 'Transfer marked as shipped',
+        in_transit: 'Transfer marked as in transit',
+        completed: 'Transfer marked as completed'
+      }
+      
+      toast.success(statusMessages[newStatus] || 'Transfer status updated')
+      loadTransfers()
+    } catch (error) {
+      console.error('Error updating transfer status:', error)
+      toast.error('Failed to update transfer status')
     }
   }
 
@@ -523,10 +546,10 @@ export default function TransfersPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Total Transfers</CardDescription>
+            <CardDescription>Total</CardDescription>
             <CardTitle className="text-2xl">{stats.total}</CardTitle>
           </CardHeader>
         </Card>
@@ -538,14 +561,20 @@ export default function TransfersPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
+            <CardDescription>Shipped</CardDescription>
+            <CardTitle className="text-2xl">{stats.shipped}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
             <CardDescription>In Transit</CardDescription>
             <CardTitle className="text-2xl">{stats.in_transit}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Arrived</CardDescription>
-            <CardTitle className="text-2xl">{stats.arrived}</CardTitle>
+            <CardDescription>Completed</CardDescription>
+            <CardTitle className="text-2xl">{stats.completed}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -581,23 +610,16 @@ export default function TransfersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={selectedTransfers.length === filteredTransfers.length && filteredTransfers.length > 0}
-                  onCheckedChange={handleSelectAll}
-                  aria-label="Select all"
-                />
-              </TableHead>
-              <TableHead>Transfer Number</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>From</TableHead>
-              <TableHead>To</TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>Quantity</TableHead>
-              <TableHead>Est. Arrival</TableHead>
-              <TableHead>Tracking</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-8"></TableHead>
+              <TableHead className="w-32">Transfer Number</TableHead>
+              <TableHead className="w-20">Type</TableHead>
+              <TableHead className="w-48">From</TableHead>
+              <TableHead className="w-48">To</TableHead>
+              <TableHead className="w-24">SKU</TableHead>
+              <TableHead className="w-24 text-right">Quantity</TableHead>
+              <TableHead className="w-28">Est. Arrival</TableHead>
+              <TableHead className="w-32">Tracking</TableHead>
+              <TableHead className="w-24">Status</TableHead>
+              <TableHead className="w-40 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -629,20 +651,12 @@ export default function TransfersPage() {
                 const StatusIcon = statusConfig[transfer.status]?.icon || Clock
                 const FromIcon = getLocationIcon(transfer.from_location_type)
                 const ToIcon = getLocationIcon(transfer.to_location_type)
-                const isSelected = selectedTransfers.includes(transfer.id)
                 
                 return (
                   <TableRow
                     key={transfer.id}
                     className="hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={(checked) => handleSelectTransfer(transfer.id, checked)}
-                        aria-label={`Select ${transfer.transfer_number}`}
-                      />
-                    </TableCell>
                     <TableCell 
                       className="font-medium"
                       onClick={() => handleRowClick(transfer.id)}
@@ -694,7 +708,7 @@ export default function TransfersPage() {
                         <span className="text-slate-400">-</span>
                       )}
                     </TableCell>
-                    <TableCell onClick={() => handleRowClick(transfer.id)}>
+                    <TableCell className="text-right" onClick={() => handleRowClick(transfer.id)}>
                       {transfer.items && transfer.items.length > 0 ? (
                         <div className="text-sm">
                           <span className="font-medium">{transfer.items[0].quantity}</span>
@@ -721,23 +735,55 @@ export default function TransfersPage() {
                         {statusConfig[transfer.status]?.label}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteTransfer(transfer.id)}
-                            className="text-red-600"
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {transfer.status === 'pending' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleUpdateTransferStatus(transfer.id, 'shipped')}
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete Transfer
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            <Package className="h-3 w-3 mr-1" />
+                            Mark Shipped
+                          </Button>
+                        )}
+                        {transfer.status === 'shipped' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleUpdateTransferStatus(transfer.id, 'in_transit')}
+                          >
+                            <Truck className="h-3 w-3 mr-1" />
+                            Mark In Transit
+                          </Button>
+                        )}
+                        {transfer.status === 'in_transit' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleUpdateTransferStatus(transfer.id, 'completed')}
+                          >
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Mark Completed
+                          </Button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-white">
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteTransfer(transfer.id)}
+                              className="text-red-600 hover:text-red-600 hover:bg-red-50 focus:text-red-600 focus:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Transfer
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
